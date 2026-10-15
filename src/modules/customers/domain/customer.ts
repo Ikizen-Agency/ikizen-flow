@@ -41,3 +41,29 @@ export function companyInitials(company: string): string {
   if (words.length === 1) return words[0]!.slice(0, 2).toUpperCase();
   return (words[0]![0]! + words[1]![0]!).toUpperCase();
 }
+
+/** Share of non-archived accounts that are still engaged (the "Client Health" retention KPI). */
+export function retentionRate(counts: Record<CustomerStatus, number>): number {
+  const tracked = counts.active + counts.pending_review + counts.inactive;
+  return tracked === 0 ? 0 : (counts.active + counts.pending_review) / tracked;
+}
+
+const STATUS_PENALTY: Record<CustomerStatus, number> = { active: 0, pending_review: 13, inactive: 40, archived: 60 };
+const STALE_GRACE_DAYS = 7;
+const MAX_STALE_PENALTY = 30;
+const OVERDUE_PENALTY = 16;
+
+export interface HealthInputs {
+  status: CustomerStatus;
+  /** Whole days since the last recorded activity; null when there was never any. */
+  daysSinceActivity: number | null;
+  overdueOrders: number;
+}
+
+/** 0-100 account health: penalises disengaged status, inactivity beyond a week and overdue receivables. */
+export function customerHealthScore({ status, daysSinceActivity, overdueOrders }: HealthInputs): number {
+  const stale =
+    daysSinceActivity === null ? MAX_STALE_PENALTY : Math.min(MAX_STALE_PENALTY, Math.max(0, daysSinceActivity - STALE_GRACE_DAYS));
+  const score = 100 - STATUS_PENALTY[status] - stale - overdueOrders * OVERDUE_PENALTY;
+  return Math.max(0, Math.min(100, score));
+}

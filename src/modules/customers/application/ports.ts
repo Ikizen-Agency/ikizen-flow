@@ -47,6 +47,11 @@ export interface NewCustomer {
 export interface CustomerRepository {
   list(query: CustomerListQuery): Promise<Page<CustomerListItem>>;
   findById(id: number): Promise<Customer | null>;
+  /** Single directory row (customer + order aggregates). */
+  findSummaryById(id: number): Promise<CustomerListItem | null>;
+  /** Case-insensitive lookup used to keep company names unique. */
+  findByCompany(company: string): Promise<Customer | null>;
+  countCreatedSince(since: Date): Promise<number>;
   /** Lightweight options for selects (e.g. "Client Account" on the sale form). */
   listOptions(): Promise<Array<Pick<Customer, "id" | "company" | "contactEmail">>>;
   countByStatus(): Promise<Record<CustomerStatus, number>>;

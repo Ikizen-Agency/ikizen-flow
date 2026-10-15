@@ -1,4 +1,5 @@
 import type { Page, PageRequest } from "../../shared-types";
+import type { OrderSummary } from "../domain/metrics";
 import type { OrderCategory, OrderStatus, PaymentTerms } from "../domain/order";
 
 export interface OrderItem {
@@ -82,6 +83,8 @@ export interface OrderRepository {
   list(query: OrderListQuery): Promise<Page<Order>>;
   findByReference(reference: string): Promise<OrderWithItems | null>;
   countByStatus(): Promise<Record<OrderStatus, number>>;
+  /** Every order as a lightweight projection, for KPI aggregation. */
+  listSummaries(): Promise<OrderSummary[]>;
   latestReference(): Promise<string | null>;
   create(order: NewOrder, now: Date): Promise<Order>;
   updateStatus(id: number, change: OrderStatusChange): Promise<void>;

@@ -31,3 +31,25 @@ export function formatRelativeTime(date: Date, now: Date): string {
   if (days === 1) return "yesterday";
   return plural(days, "day");
 }
+
+/** First UTC day of the calendar quarter that contains `date`. */
+export function startOfQuarter(date: Date): Date {
+  return new Date(Date.UTC(date.getUTCFullYear(), Math.floor(date.getUTCMonth() / 3) * 3, 1));
+}
+
+const shortDate = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
+const longDate = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
+
+/** Calendar date as shown in tables and registers: "Oct 24, 2024". */
+export function formatDate(date: Date): string {
+  return longDate.format(date);
+}
+
+/** Directory "last activity" cell: "2 hours ago", "Yesterday", "Oct 18" (or "Dec 30, 2025" in other years). */
+export function formatLastActivity(date: Date | null, now: Date): string {
+  if (!date) return "Never";
+  const days = daysBetween(date, now);
+  if (days <= 0) return formatRelativeTime(date, now);
+  if (days === 1) return "Yesterday";
+  return date.getUTCFullYear() === now.getUTCFullYear() ? shortDate.format(date) : longDate.format(date);
+}

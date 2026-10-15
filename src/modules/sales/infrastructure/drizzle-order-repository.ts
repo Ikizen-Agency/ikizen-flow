@@ -89,6 +89,20 @@ export class DrizzleOrderRepository implements OrderRepository {
     return result;
   }
 
+  listSummaries() {
+    return this.db
+      .select({
+        id: orders.id,
+        customerId: orders.customerId,
+        status: orders.status,
+        amountCents: orders.amountCents,
+        issueDate: orders.issueDate,
+        dueDate: orders.dueDate,
+        paidAt: orders.paidAt,
+      })
+      .from(orders);
+  }
+
   async latestReference() {
     const [row] = await this.db.select({ reference: orders.reference }).from(orders).orderBy(desc(orders.id)).limit(1);
     return row?.reference ?? null;

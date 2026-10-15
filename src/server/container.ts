@@ -1,7 +1,13 @@
 import "server-only";
 import { makeListRecentActivity } from "@/modules/activity/application/use-cases";
 import { DrizzleActivityRepository } from "@/modules/activity/infrastructure/drizzle-activity-repository";
-import { makeCreateCustomer, makeListCustomers } from "@/modules/customers/application/use-cases";
+import {
+  makeCreateCustomer,
+  makeGetCustomerDirectoryStats,
+  makeGetCustomerProfile,
+  makeGetCustomerSummary,
+  makeListCustomers,
+} from "@/modules/customers/application/use-cases";
 import { DrizzleCustomerRepository } from "@/modules/customers/infrastructure/drizzle-customer-repository";
 import { makeChangeOrderStatus, makeCreateOrder, makeListOrders } from "@/modules/sales/application/use-cases";
 import { DrizzleOrderRepository } from "@/modules/sales/infrastructure/drizzle-order-repository";
@@ -32,6 +38,9 @@ export const container = {
   customers: {
     list: makeListCustomers(deps),
     create: makeCreateCustomer(deps),
+    summary: makeGetCustomerSummary(deps),
+    stats: makeGetCustomerDirectoryStats(deps),
+    profile: makeGetCustomerProfile(deps),
   },
   sales: {
     list: makeListOrders(deps),

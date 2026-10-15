@@ -1,9 +1,9 @@
 import "server-only";
-import { and, asc, count, desc, eq, like, or, sql, type SQL } from "drizzle-orm";
+import { and, asc, count, desc, eq, gte, like, or, sql, type SQL } from "drizzle-orm";
 import type { Database } from "@/server/db/connect";
 import { customers, orders } from "@/server/db/schema";
 import { CUSTOMER_STATUSES, type CustomerStatus } from "../domain/customer";
-import type { Customer, CustomerListQuery, CustomerRepository, NewCustomer } from "../application/ports";
+import type { Customer, CustomerListItem, CustomerListQuery, CustomerRepository, NewCustomer } from "../application/ports";
 
 const totalSales = sql<number>`coalesce(sum(case when ${orders.status} not in ('draft','cancelled') then ${orders.amountCents} else 0 end), 0)`;
 const outstanding = sql<number>`coalesce(sum(case when ${orders.status} in ('pending','processing','invoiced') then ${orders.amountCents} else 0 end), 0)`;
@@ -21,6 +21,16 @@ function toCustomer(row: typeof customers.$inferSelect): Customer {
     paymentTerms: row.paymentTerms,
     lastActivityAt: row.lastActivityAt,
     createdAt: row.createdAt,
+  };
+}
+
+const summaryColumns = { customer: customers, totalSalesCents: totalSales, outstandingCents: outstanding };
+
+function toListItem(row: { customer: typeof customers.$inferSelect; totalSalesCents: number; outstandingCents: number }): CustomerListItem {
+  return {
+    ...toCustomer(row.customer),
+    totalSalesCents: Number(row.totalSalesCents),
+    outstandingCents: Number(row.outstandingCents),
   };
 }
 
@@ -47,7 +57,7 @@ export class DrizzleCustomerRepository implements CustomerRepository {
             : [sql`${customers.lastActivityAt} desc nulls last`];
 
     const rows = await this.db
-      .select({ customer: customers, totalSalesCents: totalSales, outstandingCents: outstanding })
+      .select(summaryColumns)
       .from(customers)
       .leftJoin(orders, eq(orders.customerId, customers.id))
       .where(where)
@@ -59,11 +69,7 @@ export class DrizzleCustomerRepository implements CustomerRepository {
     const [{ total }] = await this.db.select({ total: count() }).from(customers).where(where);
 
     return {
-      items: rows.map((r) => ({
-        ...toCustomer(r.customer),
-        totalSalesCents: Number(r.totalSalesCents),
-        outstandingCents: Number(r.outstandingCents),
-      })),
+      items: rows.map(toListItem),
       total,
       page,
       pageSize,
@@ -73,6 +79,30 @@ export class DrizzleCustomerRepository implements CustomerRepository {
   async findById(id: number) {
     const row = await this.db.query.customers.findFirst({ where: eq(customers.id, id) });
     return row ? toCustomer(row) : null;
+  }
+
+  async findSummaryById(id: number) {
+    const [row] = await this.db
+      .select(summaryColumns)
+      .from(customers)
+      .leftJoin(orders, eq(orders.customerId, customers.id))
+      .where(eq(customers.id, id))
+      .groupBy(customers.id);
+    return row ? toListItem(row) : null;
+  }
+
+  async findByCompany(company: string) {
+    const [row] = await this.db
+      .select()
+      .from(customers)
+      .where(sql`lower(${customers.company}) = lower(${company.trim()})`)
+      .limit(1);
+    return row ? toCustomer(row) : null;
+  }
+
+  async countCreatedSince(since: Date) {
+    const [{ total }] = await this.db.select({ total: count() }).from(customers).where(gte(customers.createdAt, since));
+    return total;
   }
 
   listOptions() {

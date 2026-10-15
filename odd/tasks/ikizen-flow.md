@@ -25,7 +25,7 @@ The user has a Stitch design export (`design/stitch_ikizen_flow_business_platfor
 ## Tasks
 - [x] T1 — Scaffold Next.js + Tailwind design tokens + app shell (sidebar, topbar, responsive) + Vitest. Route: delegated (writer, 2+ non-trivial files).
 - [x] T2 — Data layer: Drizzle schema (customers, orders, tasks, activity), migrations, seed with design data, repositories. Route: delegated.
-- [ ] T3 — Customers directory: list/search/filter + create customer (Server Action). Route: delegated.
+- [x] T3 — Customers directory: list/search/filter + create customer (Server Action). Route: delegated.
 - [ ] T4 — Sales orders management: list/filters/totals + create order + status change. Route: delegated.
 - [ ] T5 — Tasks kanban: columns by status, create task, move task between statuses. Route: delegated.
 - [ ] T6 — Overview dashboard: KPIs, revenue trend chart, revenue by category, critical tasks, recent sales, activity, overdue receivables — all from DB aggregates. Route: delegated.
@@ -46,5 +46,7 @@ Strategy: `ask-on-risk`. Forecast: well over 400 authored lines (greenfield) —
 
 - Review T1/T2 (base 28fee5e): assessed medium (slice_budget_reached); consent declined by user for this candidate. Reviewed boundary advances to 9f49ad1.
 
+- T3 (delegated writer): `/customers` reproduces the Stitch directory: header with total/quarter badges, Active Pipeline + Client Health KPI tiles, Add Customer / Export CSV / Bulk Actions bar, URL-driven search (debounced) + status/tier/sort filters with reset, server-side paginated table (6/page, `1 2 3 ... N` pagination), row checkboxes, `?customer=<id>` slide-over (lifetime value, open deals, derived health score, contact, recent orders as interaction log, account & billing), `?create=1` Add New Customer modal (Server Action + Zod, field errors, duplicate-name guard, optional initial engagement saved as a draft order, redirects to the new profile). `GET /customers/export` streams the filtered directory as CSV (formula-injection safe). New shared primitives: `Overlay` (Level 3 + scrim, Escape/scrim close via URL), `Pagination`, `hrefWith`. Deliberately non-functional: Bulk Actions items, row Edit and More (rendered disabled, "coming soon"); design's HQ location replaced by Account & Billing (no location in schema); "Open Full Profile" became "View Sales Orders". RED observed before implementation (9 test files / 10 tests failing: missing modules + case-insensitive duplicate check), then GREEN. Verified: `pnpm typecheck` ok; `pnpm lint` 0 problems; `pnpm test` 16 files / 77 tests pass; `pnpm build` ok (`/customers` partial prerender, `/customers/export` dynamic); `next start` smoke: /customers, ?create=1, ?status=inactive, ?customer=1, ?page=2 → 200 with seed names; export CSV 200.
+
 ## Next step
-T3 (customers directory).
+T4 (sales orders management).

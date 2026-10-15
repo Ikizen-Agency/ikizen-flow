@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addDays, daysBetween, formatRelativeTime, startOfDay } from "./time";
+import { addDays, daysBetween, formatDate, formatLastActivity, formatRelativeTime, startOfDay, startOfQuarter } from "./time";
 
 const now = new Date("2026-10-14T12:00:00Z");
 
@@ -29,5 +29,33 @@ describe("addDays / startOfDay", () => {
   it("shifts dates by whole days and truncates to UTC midnight", () => {
     expect(addDays(new Date("2026-10-31T10:00:00Z"), 30).toISOString()).toBe("2026-11-30T10:00:00.000Z");
     expect(startOfDay(new Date("2026-10-14T17:45:00Z")).toISOString()).toBe("2026-10-14T00:00:00.000Z");
+  });
+});
+
+describe("startOfQuarter", () => {
+  it("returns the first UTC day of the calendar quarter", () => {
+    expect(startOfQuarter(now).toISOString()).toBe("2026-10-01T00:00:00.000Z");
+    expect(startOfQuarter(new Date("2026-03-31T23:59:00Z")).toISOString()).toBe("2026-01-01T00:00:00.000Z");
+    expect(startOfQuarter(new Date("2026-05-02T08:00:00Z")).toISOString()).toBe("2026-04-01T00:00:00.000Z");
+  });
+});
+
+describe("formatLastActivity", () => {
+  it("uses relative wording for today and yesterday, then a short date", () => {
+    expect(formatLastActivity(new Date("2026-10-14T10:00:00Z"), now)).toBe("2 hours ago");
+    expect(formatLastActivity(new Date("2026-10-14T11:59:30Z"), now)).toBe("just now");
+    expect(formatLastActivity(new Date("2026-10-13T09:00:00Z"), now)).toBe("Yesterday");
+    expect(formatLastActivity(new Date("2026-10-08T09:00:00Z"), now)).toBe("Oct 8");
+  });
+
+  it("adds the year for dates outside the current year and handles missing values", () => {
+    expect(formatLastActivity(new Date("2025-12-30T09:00:00Z"), now)).toBe("Dec 30, 2025");
+    expect(formatLastActivity(null, now)).toBe("Never");
+  });
+});
+
+describe("formatDate", () => {
+  it("formats a UTC calendar date like the design (Oct 24, 2024)", () => {
+    expect(formatDate(new Date("2024-10-24T23:30:00Z"))).toBe("Oct 24, 2024");
   });
 });
