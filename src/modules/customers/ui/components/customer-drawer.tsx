@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { cn } from "@/shared/lib/cn";
 import { Badge, type BadgeTone } from "@/shared/ui/badge";
 import { buttonClasses } from "@/shared/ui/button";
@@ -29,6 +30,8 @@ export interface CustomerDrawerProps {
   contactEmail: string;
   details: ReadonlyArray<{ icon: string; label: string; value: string }>;
   interactions: ReadonlyArray<InteractionItem>;
+  /** Management controls (status, tier, edit, archive, delete). */
+  manage?: ReactNode;
 }
 
 const iconTone: Record<BadgeTone, string> = {
@@ -80,6 +83,8 @@ export function CustomerDrawer(props: CustomerDrawerProps) {
               </div>
             ))}
           </dl>
+
+          {props.manage}
 
           <section className="flex flex-col gap-space-sm">
             <SectionLabel>Primary Contact</SectionLabel>

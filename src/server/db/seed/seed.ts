@@ -181,7 +181,9 @@ async function insertCustomers(db: Database, now: Date, workspaceId: number, lis
         workspaceId,
         company: c.company,
         tier: c.tier,
-        status: c.status,
+        // "archived" in the seed data means a soft-archived account whose lifecycle status was inactive.
+        status: c.status === "archived" ? ("inactive" as const) : c.status,
+        archivedAt: c.status === "archived" ? new Date(now.getTime() - c.lastActiveHoursAgo * HOUR) : null,
         industry: c.industry,
         contactName: c.contactName,
         contactEmail: c.contactEmail,

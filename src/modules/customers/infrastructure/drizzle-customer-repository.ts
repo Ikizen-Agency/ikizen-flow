@@ -1,9 +1,9 @@
 import "server-only";
-import { and, asc, count, desc, eq, gte, like, or, sql, type SQL } from "drizzle-orm";
+import { and, asc, count, desc, eq, gte, inArray, isNotNull, isNull, like, or, sql, type SQL } from "drizzle-orm";
 import type { Database } from "@/server/db/connect";
-import { customers, orders } from "@/server/db/schema";
-import { CUSTOMER_STATUSES, type CustomerStatus } from "../domain/customer";
-import type { Customer, CustomerListItem, CustomerListQuery, CustomerRepository, NewCustomer } from "../application/ports";
+import { customers, orders, tasks } from "@/server/db/schema";
+import { CUSTOMER_STATUSES, effectiveCustomerStatus, type CustomerDependencies, type CustomerStatus, type CustomerTier } from "../domain/customer";
+import type { Customer, CustomerListItem, CustomerListQuery, CustomerPatch, CustomerRepository, NewCustomer } from "../application/ports";
 
 const totalSales = sql<number>`coalesce(sum(case when ${orders.status} not in ('draft','cancelled') then ${orders.amountCents} else 0 end), 0)`;
 const outstanding = sql<number>`coalesce(sum(case when ${orders.status} in ('pending','processing','invoiced') then ${orders.amountCents} else 0 end), 0)`;
@@ -13,13 +13,15 @@ function toCustomer(row: typeof customers.$inferSelect): Customer {
     id: row.id,
     company: row.company,
     tier: row.tier,
-    status: row.status,
+    status: effectiveCustomerStatus(row),
+    baseStatus: row.status,
     industry: row.industry,
     contactName: row.contactName,
     contactEmail: row.contactEmail,
     billingEmail: row.billingEmail,
     paymentTerms: row.paymentTerms,
     lastActivityAt: row.lastActivityAt,
+    archivedAt: row.archivedAt,
     createdAt: row.createdAt,
   };
 }
@@ -47,7 +49,12 @@ export class DrizzleCustomerRepository implements CustomerRepository {
 
   async list({ search, status, tier, sort = "last_active", page = 1, pageSize = 10 }: CustomerListQuery) {
     const filters: SQL[] = [eq(customers.workspaceId, this.workspaceId)];
-    if (status) filters.push(eq(customers.status, status));
+    // Archived accounts only show up under the "archived" filter.
+    if (status === "archived") filters.push(isNotNull(customers.archivedAt));
+    else {
+      filters.push(isNull(customers.archivedAt));
+      if (status) filters.push(eq(customers.status, status));
+    }
     if (tier) filters.push(eq(customers.tier, tier));
     if (search?.trim()) {
       const term = `%${search.trim()}%`;
@@ -117,12 +124,13 @@ export class DrizzleCustomerRepository implements CustomerRepository {
     return this.db
       .select({ id: customers.id, company: customers.company, contactEmail: customers.contactEmail })
       .from(customers)
-      .where(this.inWorkspace(sql`${customers.status} != 'archived'`))
+      .where(this.inWorkspace(isNull(customers.archivedAt)))
       .orderBy(asc(customers.company));
   }
 
   async countByStatus() {
-    const rows = await this.db.select({ status: customers.status, n: count() }).from(customers).where(this.inWorkspace()).groupBy(customers.status);
+    const displayStatus = sql<CustomerStatus>`case when ${customers.archivedAt} is not null then 'archived' else ${customers.status} end`;
+    const rows = await this.db.select({ status: displayStatus, n: count() }).from(customers).where(this.inWorkspace()).groupBy(displayStatus);
     const result = Object.fromEntries(CUSTOMER_STATUSES.map((s) => [s, 0])) as Record<CustomerStatus, number>;
     for (const r of rows) result[r.status] = r.n;
     return result;
@@ -138,5 +146,69 @@ export class DrizzleCustomerRepository implements CustomerRepository {
 
   async touch(id: number, at: Date) {
     await this.db.update(customers).set({ lastActivityAt: at, updatedAt: at }).where(this.inWorkspace(eq(customers.id, id)));
+  }
+
+  async findManyByIds(ids: ReadonlyArray<number>) {
+    if (ids.length === 0) return [];
+    const rows = await this.db.select().from(customers).where(this.inWorkspace(inArray(customers.id, [...ids]))).orderBy(asc(customers.company));
+    return rows.map(toCustomer);
+  }
+
+  async update(id: number, patch: CustomerPatch, now: Date) {
+    const [row] = await this.db
+      .update(customers)
+      .set({ ...patch, updatedAt: now })
+      .where(this.inWorkspace(eq(customers.id, id)))
+      .returning();
+    return row ? toCustomer(row) : null;
+  }
+
+  async setArchived(ids: ReadonlyArray<number>, archivedAt: Date | null, now: Date) {
+    if (ids.length === 0) return [];
+    const rows = await this.db
+      .update(customers)
+      .set({ archivedAt, updatedAt: now })
+      .where(this.inWorkspace(inArray(customers.id, [...ids]), archivedAt ? isNull(customers.archivedAt) : isNotNull(customers.archivedAt)))
+      .returning({ id: customers.id });
+    return rows.map((r) => r.id);
+  }
+
+  async setTier(ids: ReadonlyArray<number>, tier: CustomerTier, now: Date) {
+    if (ids.length === 0) return [];
+    const rows = await this.db
+      .update(customers)
+      .set({ tier, updatedAt: now })
+      .where(this.inWorkspace(inArray(customers.id, [...ids])))
+      .returning({ id: customers.id });
+    return rows.map((r) => r.id);
+  }
+
+  async dependencies(ids: ReadonlyArray<number>) {
+    const result = new Map<number, CustomerDependencies>();
+    if (ids.length === 0) return result;
+    const owned = this.inWorkspace(inArray(customers.id, [...ids]));
+    const [orderRows, taskRows] = await Promise.all([
+      this.db
+        .select({ id: customers.id, n: count(orders.id) })
+        .from(customers)
+        .leftJoin(orders, eq(orders.customerId, customers.id))
+        .where(owned)
+        .groupBy(customers.id),
+      this.db
+        .select({ id: customers.id, n: count(tasks.id) })
+        .from(customers)
+        .leftJoin(tasks, eq(tasks.customerId, customers.id))
+        .where(owned)
+        .groupBy(customers.id),
+    ]);
+    for (const r of orderRows) result.set(r.id, { orders: r.n, tasks: 0 });
+    for (const r of taskRows) result.set(r.id, { orders: result.get(r.id)?.orders ?? 0, tasks: r.n });
+    return result;
+  }
+
+  async deleteMany(ids: ReadonlyArray<number>) {
+    if (ids.length === 0) return [];
+    const rows = await this.db.delete(customers).where(this.inWorkspace(inArray(customers.id, [...ids]))).returning({ id: customers.id });
+    return rows.map((r) => r.id);
   }
 }

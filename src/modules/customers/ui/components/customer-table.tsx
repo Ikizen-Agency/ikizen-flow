@@ -2,11 +2,13 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { EmptyState } from "@/shared/ui/empty-state";
 import { Icon } from "@/shared/ui/icon";
 import type { CustomerStatus, CustomerTier } from "../../domain/customer";
 import { CompanyTile, CustomerStatusBadge, TierTag } from "./customer-badges";
+import { CustomerRowMenu } from "./customer-row-menu";
+import { useCustomerSelection } from "./customer-selection";
 
 /** Display-ready directory row (formatting happens on the server). */
 export interface CustomerRow {
@@ -19,22 +21,15 @@ export interface CustomerRow {
   lastActivity: string;
   totalSales: string;
   href: string;
+  editHref: string;
 }
 
 const iconButton = "rounded-control p-1.5 text-ink-subtle transition-colors hover:bg-surface-container";
 
 export function CustomerTable({ rows, footer }: { rows: ReadonlyArray<CustomerRow>; footer?: ReactNode }) {
   const router = useRouter();
-  const [selected, setSelected] = useState<ReadonlySet<number>>(new Set());
+  const { selected, toggle, replace } = useCustomerSelection();
   const allSelected = rows.length > 0 && rows.every((r) => selected.has(r.id));
-
-  const toggle = (id: number) =>
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
 
   return (
     <div className="flex flex-col overflow-hidden rounded-card border border-line bg-card shadow-level-1">
@@ -48,7 +43,7 @@ export function CustomerTable({ rows, footer }: { rows: ReadonlyArray<CustomerRo
                   type="checkbox"
                   aria-label="Select all customers on this page"
                   checked={allSelected}
-                  onChange={() => setSelected(allSelected ? new Set() : new Set(rows.map((r) => r.id)))}
+                  onChange={() => replace(allSelected ? [] : rows.map((r) => r.id))}
                   className="size-4 cursor-pointer accent-accent"
                 />
               </th>
@@ -133,12 +128,18 @@ export function CustomerTable({ rows, footer }: { rows: ReadonlyArray<CustomerRo
                       <Link href={row.href} scroll={false} title="View" aria-label={`View ${row.company}`} className={`${iconButton} hover:text-accent`}>
                         <Icon name="visibility" size={18} />
                       </Link>
-                      <button type="button" disabled title="Editing is coming soon" aria-label="Edit (coming soon)" className={`${iconButton} disabled:opacity-40`}>
+                      <Link href={row.editHref} scroll={false} title="Edit" aria-label={`Edit ${row.company}`} className={`${iconButton} hover:text-accent`}>
                         <Icon name="edit" size={18} />
-                      </button>
-                      <button type="button" disabled title="More actions are coming soon" aria-label="More actions (coming soon)" className={`${iconButton} disabled:opacity-40`}>
-                        <Icon name="more_vert" size={18} />
-                      </button>
+                      </Link>
+                      <CustomerRowMenu
+                        id={row.id}
+                        company={row.company}
+                        contactEmail={row.contactEmail}
+                        archived={row.status === "archived"}
+                        viewHref={row.href}
+                        editHref={row.editHref}
+                        triggerClassName={`${iconButton} hover:text-accent`}
+                      />
                     </div>
                   </td>
                 </tr>
@@ -149,7 +150,7 @@ export function CustomerTable({ rows, footer }: { rows: ReadonlyArray<CustomerRo
       </div>
       {selected.size > 0 ? (
         <p className="border-t border-line-soft px-space-md py-space-sm text-body-sm text-ink-subtle" aria-live="polite">
-          {selected.size} selected on this page
+          {selected.size} selected. Use Bulk Actions to act on them.
         </p>
       ) : null}
       {footer}

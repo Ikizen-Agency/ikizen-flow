@@ -6,7 +6,7 @@
 import { relations, sql } from "drizzle-orm";
 import { index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 import { ACTIVITY_CATEGORIES } from "../../modules/activity/domain/activity";
-import { CUSTOMER_STATUSES, CUSTOMER_TIERS } from "../../modules/customers/domain/customer";
+import { ASSIGNABLE_CUSTOMER_STATUSES, CUSTOMER_TIERS } from "../../modules/customers/domain/customer";
 import { EMAIL_ENTITY_TYPES, EMAIL_KINDS, EMAIL_STATUSES } from "../../modules/mail/domain/email";
 import { NOTIFICATION_TYPES } from "../../modules/notifications/domain/notification";
 import { ORDER_CATEGORIES, ORDER_STATUSES, PAYMENT_TERMS } from "../../modules/sales/domain/order";
@@ -147,13 +147,16 @@ export const customers = sqliteTable(
     workspaceId: workspaceId(),
     company: text("company").notNull(),
     tier: text("tier", { enum: CUSTOMER_TIERS }).notNull(),
-    status: text("status", { enum: CUSTOMER_STATUSES }).notNull().default("active"),
+    /** Lifecycle status; archiving is the separate `archived_at` flag (display status "archived"). */
+    status: text("status", { enum: ASSIGNABLE_CUSTOMER_STATUSES }).notNull().default("active"),
     industry: text("industry").notNull(),
     contactName: text("contact_name").notNull(),
     contactEmail: text("contact_email").notNull(),
     billingEmail: text("billing_email"),
     paymentTerms: text("payment_terms", { enum: PAYMENT_TERMS }).notNull().default("net_30"),
     lastActivityAt: integer("last_activity_at", { mode: "timestamp_ms" }),
+    /** Soft archive: hidden from the directory by default, restorable. */
+    archivedAt: integer("archived_at", { mode: "timestamp_ms" }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },

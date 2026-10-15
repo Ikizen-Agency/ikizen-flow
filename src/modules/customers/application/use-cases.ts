@@ -2,11 +2,21 @@ import type { ActivityRepository } from "../../activity/application/ports";
 import type { OrderRepository } from "../../sales/application/ports";
 import { billedBetween, isOpen, openPipelineCents } from "../../sales/domain/metrics";
 import { daysOverdue } from "../../sales/domain/order";
-import type { Clock } from "../../shared-types";
+import type { NewOutboxEmail } from "../../mail/application/ports";
+import type { OutboxEmail } from "../../mail/domain/email";
+import { NotFoundError, type Clock } from "../../shared-types";
 import { addDays, daysBetween, startOfQuarter } from "@/shared/domain/time";
 import { percentChange } from "@/shared/domain/stats";
-import { customerHealthScore, retentionRate } from "../domain/customer";
-import type { CustomerListQuery, CustomerRepository, NewCustomer } from "./ports";
+import {
+  assertCustomerDeletable,
+  CUSTOMER_STATUS_LABELS,
+  CUSTOMER_TIER_LABELS,
+  customerHealthScore,
+  retentionRate,
+  type CustomerDependencies,
+  type CustomerTier,
+} from "../domain/customer";
+import type { Customer, CustomerListQuery, CustomerPatch, CustomerRepository, NewCustomer } from "./ports";
 
 export interface CustomerDeps {
   customers: CustomerRepository;
@@ -95,4 +105,159 @@ export const makeGetCustomerProfile =
       }),
       recentOrders: items.slice(0, 3),
     };
+  };
+
+/** What changed, as an activity predicate ("changed X status to Active", "updated client details for X"). */
+function describeUpdate(before: Customer, after: Customer): string {
+  const changes: string[] = [];
+  if (before.baseStatus !== after.baseStatus) changes.push(`status to ${CUSTOMER_STATUS_LABELS[after.baseStatus]}`);
+  if (before.tier !== after.tier) changes.push(`tier to ${CUSTOMER_TIER_LABELS[after.tier]}`);
+  const otherFieldsChanged = (["company", "industry", "contactName", "contactEmail", "billingEmail", "paymentTerms"] as const).some(
+    (field) => before[field] !== after[field],
+  );
+  if (changes.length > 0 && !otherFieldsChanged) return `changed ${after.company} ${changes.join(" and ")}`;
+  return `updated client details for ${after.company}`;
+}
+
+/** Edits any field from the create form, keeping company names unique per workspace. */
+export const makeUpdateCustomer =
+  ({ customers, activity, clock }: CustomerDeps) =>
+  async (id: number, patch: CustomerPatch, actorId: number | null = null) => {
+    const before = await customers.findById(id);
+    if (!before) throw new NotFoundError("Customer", id);
+    if (patch.company !== undefined) {
+      const clash = await customers.findByCompany(patch.company);
+      if (clash && clash.id !== id) throw new DuplicateCustomerError(patch.company);
+    }
+    const now = clock();
+    const updated = await customers.update(id, patch, now);
+    if (!updated) throw new NotFoundError("Customer", id);
+    await activity.record({ actorId, message: describeUpdate(before, updated), category: "pipeline", entityType: "customer", entityId: id, createdAt: now });
+    return updated;
+  };
+
+/** Archives (or restores) the workspace's customers among `ids`; returns the customers that changed. */
+export const makeArchiveCustomers =
+  ({ customers, activity, clock }: CustomerDeps) =>
+  async (ids: ReadonlyArray<number>, archived: boolean, actorId: number | null = null) => {
+    const now = clock();
+    const changedIds = await customers.setArchived(ids, archived ? now : null, now);
+    const changed = await customers.findManyByIds(changedIds);
+    for (const customer of changed) {
+      await activity.record({
+        actorId,
+        message: `${archived ? "archived" : "restored"} client ${customer.company}`,
+        category: "pipeline",
+        entityType: "customer",
+        entityId: customer.id,
+        createdAt: now,
+      });
+    }
+    return changed;
+  };
+
+/** "Apply Tier Tag": retags the workspace's customers among `ids`. */
+export const makeApplyCustomerTier =
+  ({ customers, activity, clock }: CustomerDeps) =>
+  async (ids: ReadonlyArray<number>, tier: CustomerTier, actorId: number | null = null) => {
+    const now = clock();
+    const changed = await customers.findManyByIds(await customers.setTier(ids, tier, now));
+    for (const customer of changed) {
+      await activity.record({
+        actorId,
+        message: `moved ${customer.company} to the ${CUSTOMER_TIER_LABELS[tier]} tier`,
+        category: "pipeline",
+        entityType: "customer",
+        entityId: customer.id,
+        createdAt: now,
+      });
+    }
+    return changed;
+  };
+
+export interface DeleteCustomersResult {
+  deleted: Customer[];
+  /** Customers kept because they have orders or tasks (archive them instead). */
+  skipped: Array<{ customer: Customer } & CustomerDependencies>;
+}
+
+/** Hard-deletes the workspace's customers among `ids` that have no orders or tasks. */
+export const makeDeleteCustomers =
+  ({ customers, activity, clock }: CustomerDeps) =>
+  async (ids: ReadonlyArray<number>, actorId: number | null = null): Promise<DeleteCustomersResult> => {
+    const found = await customers.findManyByIds(ids);
+    const dependencies = await customers.dependencies(found.map((c) => c.id));
+    const result: DeleteCustomersResult = { deleted: [], skipped: [] };
+    const deletable: Customer[] = [];
+    for (const customer of found) {
+      const deps = dependencies.get(customer.id) ?? { orders: 0, tasks: 0 };
+      if (deps.orders > 0 || deps.tasks > 0) result.skipped.push({ customer, ...deps });
+      else deletable.push(customer);
+    }
+    const deletedIds = new Set(await customers.deleteMany(deletable.map((c) => c.id)));
+    result.deleted = deletable.filter((c) => deletedIds.has(c.id));
+    const now = clock();
+    for (const customer of result.deleted) {
+      await activity.record({ actorId, message: `deleted client ${customer.company}`, category: "pipeline", entityType: "customer", entityId: customer.id, createdAt: now });
+    }
+    return result;
+  };
+
+/** Deletes one customer, or throws `CustomerHasDependenciesError` suggesting to archive it. */
+export const makeDeleteCustomer = (deps: CustomerDeps) => {
+  const deleteMany = makeDeleteCustomers(deps);
+  return async (id: number, actorId: number | null = null) => {
+    const customer = await deps.customers.findById(id);
+    if (!customer) throw new NotFoundError("Customer", id);
+    assertCustomerDeletable(customer.company, (await deps.customers.dependencies([id])).get(id) ?? { orders: 0, tasks: 0 });
+    await deleteMany([id], actorId);
+    return customer;
+  };
+};
+
+export interface CampaignInput {
+  ids: ReadonlyArray<number>;
+  subject: string;
+  message: string;
+}
+
+export interface CampaignSummary {
+  total: number;
+  sent: number;
+  logged: number;
+  failed: number;
+}
+
+/** "Send Campaign": one outbox email (kind `campaign`) to the contact of each selected customer. */
+export const makeSendCampaign =
+  ({ customers, activity, clock, sendEmail }: CustomerDeps & { sendEmail: (email: NewOutboxEmail) => Promise<OutboxEmail> }) =>
+  async ({ ids, subject, message }: CampaignInput, actorId: number | null = null): Promise<CampaignSummary> => {
+    const recipients = await customers.findManyByIds(ids);
+    const summary: CampaignSummary = { total: recipients.length, sent: 0, logged: 0, failed: 0 };
+    for (const customer of recipients) {
+      try {
+        const email = await sendEmail({
+          to: customer.contactEmail,
+          subject,
+          text: `Hi ${customer.contactName},\n\n${message}`,
+          kind: "campaign",
+          relatedEntityType: "customer",
+          relatedEntityId: customer.id,
+          createdById: actorId,
+        });
+        summary[email.status === "queued" ? "failed" : email.status] += 1;
+      } catch {
+        // Invalid recipient address (rejected before it is stored): count it and keep going.
+        summary.failed += 1;
+      }
+    }
+    if (recipients.length > 0) {
+      await activity.record({
+        actorId,
+        message: `sent the campaign "${subject}" to ${recipients.length} client${recipients.length === 1 ? "" : "s"}`,
+        category: "pipeline",
+        createdAt: clock(),
+      });
+    }
+    return summary;
   };

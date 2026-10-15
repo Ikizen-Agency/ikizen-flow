@@ -6,11 +6,14 @@ import { Pagination } from "@/shared/ui/pagination";
 import { formatMoney } from "@/shared/domain/money";
 import { formatPercent } from "@/shared/domain/stats";
 import { formatDate, formatLastActivity } from "@/shared/domain/time";
-import { effectiveOrderStatus, ORDER_STATUS_LABELS, PAYMENT_TERMS_LABELS, type EffectiveOrderStatus } from "../../sales/domain/order";
+import { effectiveOrderStatus, ORDER_STATUS_LABELS, PAYMENT_TERMS, PAYMENT_TERMS_LABELS, type EffectiveOrderStatus } from "../../sales/domain/order";
 import { firstParam, parseCustomerListParams, type SearchParamsRecord } from "../application/list-params";
 import { CUSTOMER_STATUS_LABELS, CUSTOMER_STATUSES, CUSTOMER_TIER_LABELS, CUSTOMER_TIERS } from "../domain/customer";
 import { CreateCustomerDialog } from "./components/create-customer-dialog";
 import { CustomerDrawer, type InteractionItem } from "./components/customer-drawer";
+import { CustomerDrawerActions } from "./components/customer-drawer-actions";
+import { CustomerSelectionProvider } from "./components/customer-selection";
+import { EditCustomerDialog } from "./components/edit-customer-dialog";
 import { CustomerFilters } from "./components/customer-filters";
 import { CustomerTable } from "./components/customer-table";
 import { CustomersHeader } from "./components/customers-header";
@@ -21,6 +24,12 @@ const PATH = "/customers";
 const STATUS_OPTIONS = CUSTOMER_STATUSES.map((value) => ({ value, label: CUSTOMER_STATUS_LABELS[value] }));
 const TIER_OPTIONS = CUSTOMER_TIERS.map((value) => ({ value, label: CUSTOMER_TIER_LABELS[value] }));
 const NEW_STATUS_OPTIONS = NEW_CUSTOMER_STATUSES.map((value) => ({ value, label: CUSTOMER_STATUS_LABELS[value] }));
+const TERMS_OPTIONS = PAYMENT_TERMS.map((value) => ({ value, label: PAYMENT_TERMS_LABELS[value] }));
+
+const positiveId = (value: string | undefined) => {
+  const n = Number(value);
+  return Number.isInteger(n) && n > 0 ? n : null;
+};
 const SORT_OPTIONS = [
   { value: "last_active", label: "Last Active" },
   { value: "sales_desc", label: "Total Sales (High to Low)" },
@@ -53,13 +62,15 @@ export async function CustomersDirectory({ searchParams }: { searchParams: Promi
     sort: query.sort === "last_active" ? undefined : query.sort,
   };
   const listParams = { ...filters, page: query.page > 1 ? query.page : undefined };
-  const customerId = Number(firstParam(params.customer));
+  const customerId = positiveId(firstParam(params.customer));
+  const editId = positiveId(firstParam(params.edit));
   const creating = firstParam(params.create) === "1";
 
-  const [page, stats, profile] = await Promise.all([
+  const [page, stats, profile, editing] = await Promise.all([
     app.customers.list(query),
     app.customers.stats(),
-    Number.isInteger(customerId) && customerId > 0 ? app.customers.profile(customerId) : Promise.resolve(null),
+    customerId ? app.customers.profile(customerId) : Promise.resolve(null),
+    editId ? app.customers.summary(editId) : Promise.resolve(null),
   ]);
 
   const rows = page.items.map((c) => ({
@@ -72,12 +83,14 @@ export async function CustomersDirectory({ searchParams }: { searchParams: Promi
     lastActivity: formatLastActivity(c.lastActivityAt, now),
     totalSales: formatMoney(c.totalSalesCents, { decimals: false }),
     href: hrefWith(PATH, listParams, { customer: c.id }),
+    editHref: hrefWith(PATH, listParams, { edit: c.id }),
   }));
 
   const trend = stats.billingTrend;
   const closeHref = hrefWith(PATH, listParams);
 
   return (
+    <CustomerSelectionProvider>
     <div className="flex flex-col gap-space-lg">
       <CustomersHeader
         workspaceName={ctx.workspace.name}
@@ -88,6 +101,7 @@ export async function CustomersDirectory({ searchParams }: { searchParams: Promi
         retention={formatPercent(stats.retention)}
         addHref={hrefWith(PATH, listParams, { create: 1 })}
         exportHref={hrefWith(`${PATH}/export`, filters)}
+        tierOptions={TIER_OPTIONS}
       />
       <CustomerFilters current={filters} statusOptions={STATUS_OPTIONS} tierOptions={TIER_OPTIONS} sortOptions={SORT_OPTIONS} />
       <CustomerTable
@@ -121,6 +135,19 @@ export async function CustomersDirectory({ searchParams }: { searchParams: Promi
             { icon: "account_balance_wallet", label: "Outstanding", value: formatMoney(profile.customer.outstandingCents) },
             { icon: "calendar_today", label: "Client since", value: formatDate(profile.customer.createdAt) },
           ]}
+          manage={
+            <CustomerDrawerActions
+              id={profile.customer.id}
+              company={profile.customer.company}
+              status={profile.customer.baseStatus}
+              tier={profile.customer.tier}
+              archived={profile.customer.archivedAt !== null}
+              statusOptions={NEW_STATUS_OPTIONS}
+              tierOptions={TIER_OPTIONS}
+              editHref={hrefWith(PATH, listParams, { edit: profile.customer.id })}
+              closeHref={closeHref}
+            />
+          }
           interactions={profile.recentOrders.map((o): InteractionItem => {
             const status = effectiveOrderStatus(o, now);
             return {
@@ -135,7 +162,29 @@ export async function CustomersDirectory({ searchParams }: { searchParams: Promi
       ) : null}
 
       {creating ? <CreateCustomerDialog closeHref={closeHref} tierOptions={TIER_OPTIONS} statusOptions={NEW_STATUS_OPTIONS} /> : null}
+
+      {editing ? (
+        <EditCustomerDialog
+          key={editing.id}
+          closeHref={closeHref}
+          customer={{
+            id: editing.id,
+            company: editing.company,
+            tier: editing.tier,
+            status: editing.baseStatus,
+            industry: editing.industry,
+            contactName: editing.contactName,
+            contactEmail: editing.contactEmail,
+            billingEmail: editing.billingEmail ?? "",
+            paymentTerms: editing.paymentTerms,
+          }}
+          tierOptions={TIER_OPTIONS}
+          statusOptions={NEW_STATUS_OPTIONS}
+          termsOptions={TERMS_OPTIONS}
+        />
+      ) : null}
     </div>
+    </CustomerSelectionProvider>
   );
 }
 

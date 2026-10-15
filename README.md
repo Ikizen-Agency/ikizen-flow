@@ -7,7 +7,7 @@ Fullstack business operations platform built with Next.js, implementing the Stit
 | Route | Screen | Backend |
 | --- | --- | --- |
 | `/` | Overview dashboard: KPIs, revenue trend, revenue by category, critical tasks, recent sales, team activity, overdue receivables | DB aggregates, complete task / send reminder actions |
-| `/customers` | Customers directory: search, filters, pagination, detail panel, create customer | Server Actions, `GET /customers/export` (CSV) |
+| `/customers` | Customers directory: search, filters, pagination, detail panel, create / edit customer, status and tier changes, archive / unarchive (`?status=archived`), delete (only without orders or tasks), row "More actions" menu, bulk actions on selected rows (Send Campaign email, Apply Tier Tag, Archive, Delete) | Server Actions, `GET /customers/export` (CSV) |
 | `/sales` | Sales orders: KPIs, status tabs, create order with line items, status transitions | Server Actions, `GET /api/orders` (JSON / CSV) |
 | `/tasks` | Tasks kanban: filters, drag and drop, list view, task detail, create task | Server Actions with optimistic updates |
 | `/help` | Help Center: getting started, keyboard shortcuts, module guides, FAQ, contact support form | Server Action emails `SUPPORT_EMAIL` through the outbox |

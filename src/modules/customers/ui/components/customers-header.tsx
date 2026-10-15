@@ -15,6 +15,7 @@ export interface CustomersHeaderProps {
   retention: string;
   addHref: string;
   exportHref: string;
+  tierOptions: ReadonlyArray<{ value: string; label: string }>;
 }
 
 export function CustomersHeader({
@@ -26,6 +27,7 @@ export function CustomersHeader({
   retention,
   addHref,
   exportHref,
+  tierOptions,
 }: CustomersHeaderProps) {
   return (
     <div className="grid grid-cols-1 items-stretch gap-gutter lg:grid-cols-12">
@@ -54,7 +56,7 @@ export function CustomersHeader({
             <Icon name="file_download" size={18} />
             Export CSV
           </a>
-          <BulkActionsMenu />
+          <BulkActionsMenu tierOptions={tierOptions} />
         </div>
       </div>
       <div className="grid grid-cols-1 gap-space-md sm:grid-cols-2 lg:col-span-5">

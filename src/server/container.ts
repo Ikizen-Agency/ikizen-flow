@@ -4,11 +4,17 @@ import { makeGetDashboard, makeSendPaymentReminder } from "@/modules/dashboard/a
 import { DrizzleDashboardRepository } from "@/modules/dashboard/infrastructure/drizzle-dashboard-repository";
 import { DrizzleActivityRepository } from "@/modules/activity/infrastructure/drizzle-activity-repository";
 import {
+  makeApplyCustomerTier,
+  makeArchiveCustomers,
   makeCreateCustomer,
+  makeDeleteCustomer,
+  makeDeleteCustomers,
   makeGetCustomerDirectoryStats,
   makeGetCustomerProfile,
   makeGetCustomerSummary,
   makeListCustomers,
+  makeSendCampaign,
+  makeUpdateCustomer,
 } from "@/modules/customers/application/use-cases";
 import { DrizzleCustomerRepository } from "@/modules/customers/infrastructure/drizzle-customer-repository";
 import { makeListOutbox, makeSendEmail } from "@/modules/mail/application/use-cases";
@@ -75,8 +81,9 @@ export function forWorkspace(workspaceId: number) {
     search: new DrizzleSearchRepository(db, workspaceId),
   };
   const notify = makeNotify({ notifications: repositories.notifications, clock });
+  const sendEmail = makeSendEmail({ outbox: repositories.outbox, mailer, clock });
   // `notify` is an optional dependency of task, sales and dashboard use cases (they emit notifications).
-  const deps = { ...repositories, clock, notify };
+  const deps = { ...repositories, clock, notify, sendEmail };
 
   return {
     workspaceId,
@@ -88,6 +95,12 @@ export function forWorkspace(workspaceId: number) {
       summary: makeGetCustomerSummary(deps),
       stats: makeGetCustomerDirectoryStats(deps),
       profile: makeGetCustomerProfile(deps),
+      update: makeUpdateCustomer(deps),
+      archive: makeArchiveCustomers(deps),
+      applyTier: makeApplyCustomerTier(deps),
+      delete: makeDeleteCustomer(deps),
+      deleteMany: makeDeleteCustomers(deps),
+      sendCampaign: makeSendCampaign(deps),
     },
     sales: {
       list: makeListOrders(deps),
@@ -125,7 +138,7 @@ export function forWorkspace(workspaceId: number) {
     },
     mail: {
       /** Persists to the outbox, then delivers (SMTP or log); returns the entry with its final status. */
-      send: makeSendEmail({ outbox: repositories.outbox, mailer, clock }),
+      send: sendEmail,
       outbox: makeListOutbox(deps),
       transport: mailer.transport,
     },

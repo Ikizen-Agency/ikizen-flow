@@ -8,7 +8,12 @@ export const CUSTOMER_TIER_LABELS: Record<CustomerTier, string> = {
 };
 
 export const CUSTOMER_STATUSES = ["active", "pending_review", "inactive", "archived"] as const;
+/** Display status. "archived" is derived from `archivedAt`; the others are stored. */
 export type CustomerStatus = (typeof CUSTOMER_STATUSES)[number];
+
+/** Lifecycle statuses that can be stored and assigned directly (archiving is a separate, reversible flag). */
+export const ASSIGNABLE_CUSTOMER_STATUSES = ["active", "pending_review", "inactive"] as const;
+export type AssignableCustomerStatus = (typeof ASSIGNABLE_CUSTOMER_STATUSES)[number];
 
 export const CUSTOMER_STATUS_LABELS: Record<CustomerStatus, string> = {
   active: "Active",
@@ -66,4 +71,35 @@ export function customerHealthScore({ status, daysSinceActivity, overdueOrders }
     daysSinceActivity === null ? MAX_STALE_PENALTY : Math.min(MAX_STALE_PENALTY, Math.max(0, daysSinceActivity - STALE_GRACE_DAYS));
   const score = 100 - STATUS_PENALTY[status] - stale - overdueOrders * OVERDUE_PENALTY;
   return Math.max(0, Math.min(100, score));
+}
+
+/** Archived accounts keep their lifecycle status underneath, so unarchiving restores it. */
+export function effectiveCustomerStatus({ status, archivedAt }: { status: AssignableCustomerStatus; archivedAt: Date | null }): CustomerStatus {
+  return archivedAt ? "archived" : status;
+}
+
+export interface CustomerDependencies {
+  orders: number;
+  tasks: number;
+}
+
+const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
+
+export class CustomerHasDependenciesError extends Error {
+  constructor(
+    readonly company: string,
+    readonly dependencies: CustomerDependencies,
+  ) {
+    const parts = [
+      dependencies.orders ? plural(dependencies.orders, "order") : null,
+      dependencies.tasks ? plural(dependencies.tasks, "task") : null,
+    ].filter(Boolean);
+    super(`${company} has ${parts.join(" and ")} and cannot be deleted. Archive it instead to keep its history.`);
+    this.name = "CustomerHasDependenciesError";
+  }
+}
+
+/** Hard deletion is only allowed for accounts without orders or tasks; the rest must be archived. */
+export function assertCustomerDeletable(company: string, dependencies: CustomerDependencies): void {
+  if (dependencies.orders > 0 || dependencies.tasks > 0) throw new CustomerHasDependenciesError(company, dependencies);
 }

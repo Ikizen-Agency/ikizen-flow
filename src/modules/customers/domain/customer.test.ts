@@ -1,5 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { companyInitials, customerHealthScore, customerStatusTone, isEngaged, retentionRate } from "./customer";
+import {
+  ASSIGNABLE_CUSTOMER_STATUSES,
+  assertCustomerDeletable,
+  companyInitials,
+  CustomerHasDependenciesError,
+  customerHealthScore,
+  customerStatusTone,
+  effectiveCustomerStatus,
+  isEngaged,
+  retentionRate,
+} from "./customer";
 
 describe("companyInitials", () => {
   it("uses the first letters of the first two significant words", () => {
@@ -45,5 +55,33 @@ describe("customerHealthScore", () => {
     expect(customerHealthScore({ status: "pending_review", daysSinceActivity: 3, overdueOrders: 0 })).toBe(87);
     expect(customerHealthScore({ status: "archived", daysSinceActivity: 400, overdueOrders: 5 })).toBe(0);
     expect(customerHealthScore({ status: "active", daysSinceActivity: null, overdueOrders: 0 })).toBe(70);
+  });
+});
+
+describe("archiving", () => {
+  it("derives the archived display status from archivedAt, keeping the stored status otherwise", () => {
+    expect(effectiveCustomerStatus({ status: "active", archivedAt: null })).toBe("active");
+    expect(effectiveCustomerStatus({ status: "inactive", archivedAt: new Date("2026-01-01") })).toBe("archived");
+  });
+
+  it("only lets the lifecycle statuses be assigned directly", () => {
+    expect(ASSIGNABLE_CUSTOMER_STATUSES).toEqual(["active", "pending_review", "inactive"]);
+  });
+});
+
+describe("assertCustomerDeletable", () => {
+  it("allows deleting a customer without orders or tasks", () => {
+    expect(() => assertCustomerDeletable("Solas", { orders: 0, tasks: 0 })).not.toThrow();
+  });
+
+  it("refuses to delete a customer with history and suggests archiving", () => {
+    try {
+      assertCustomerDeletable("Apex", { orders: 3, tasks: 1 });
+      expect.unreachable();
+    } catch (error) {
+      expect(error).toBeInstanceOf(CustomerHasDependenciesError);
+      expect((error as Error).message).toMatch(/3 orders and 1 task/);
+      expect((error as Error).message).toMatch(/archive/i);
+    }
   });
 });

@@ -24,3 +24,7 @@ export { Overlay } from "./overlay";
 export type { OverlayProps } from "./overlay";
 export { Pagination } from "./pagination";
 export type { PaginationProps } from "./pagination";
+export { ConfirmDialog, Dialog } from "./dialog";
+export type { ConfirmDialogProps, DialogProps } from "./dialog";
+export { Menu, MenuItem } from "./menu";
+export type { MenuItemProps, MenuProps } from "./menu";

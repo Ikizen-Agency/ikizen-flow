@@ -1,18 +1,22 @@
 import type { Page, PageRequest } from "../../shared-types";
-import type { CustomerStatus, CustomerTier } from "../domain/customer";
+import type { AssignableCustomerStatus, CustomerDependencies, CustomerStatus, CustomerTier } from "../domain/customer";
 import type { PaymentTerms } from "../../sales/domain/order";
 
 export interface Customer {
   id: number;
   company: string;
   tier: CustomerTier;
+  /** Display status ("archived" when `archivedAt` is set). */
   status: CustomerStatus;
+  /** Stored lifecycle status, kept while archived and restored on unarchive. */
+  baseStatus: AssignableCustomerStatus;
   industry: string;
   contactName: string;
   contactEmail: string;
   billingEmail: string | null;
   paymentTerms: PaymentTerms;
   lastActivityAt: Date | null;
+  archivedAt: Date | null;
   createdAt: Date;
 }
 
@@ -36,13 +40,16 @@ export interface CustomerListQuery extends PageRequest {
 export interface NewCustomer {
   company: string;
   tier: CustomerTier;
-  status: CustomerStatus;
+  status: AssignableCustomerStatus;
   industry: string;
   contactName: string;
   contactEmail: string;
   billingEmail?: string | null;
   paymentTerms?: PaymentTerms;
 }
+
+/** Editable fields of a customer (every field from the create form). */
+export type CustomerPatch = Partial<Omit<NewCustomer, "billingEmail">> & { billingEmail?: string | null };
 
 export interface CustomerRepository {
   list(query: CustomerListQuery): Promise<Page<CustomerListItem>>;
@@ -57,4 +64,14 @@ export interface CustomerRepository {
   countByStatus(): Promise<Record<CustomerStatus, number>>;
   create(input: NewCustomer, now: Date): Promise<Customer>;
   touch(id: number, at: Date): Promise<void>;
+  /** Customers of this workspace among `ids` (ids of other workspaces are ignored). */
+  findManyByIds(ids: ReadonlyArray<number>): Promise<Customer[]>;
+  update(id: number, patch: CustomerPatch, now: Date): Promise<Customer | null>;
+  /** Sets or clears `archivedAt` on the workspace's customers among `ids`; returns the ids changed. */
+  setArchived(ids: ReadonlyArray<number>, archivedAt: Date | null, now: Date): Promise<number[]>;
+  setTier(ids: ReadonlyArray<number>, tier: CustomerTier, now: Date): Promise<number[]>;
+  /** Orders and tasks referencing each of the workspace's customers among `ids`. */
+  dependencies(ids: ReadonlyArray<number>): Promise<Map<number, CustomerDependencies>>;
+  /** Hard delete of the workspace's customers among `ids`; returns the ids deleted. */
+  deleteMany(ids: ReadonlyArray<number>): Promise<number[]>;
 }
