@@ -20,6 +20,7 @@ describe("pageTitleFor", () => {
     expect(pageTitleFor("/customers")).toBe("Customers");
     expect(pageTitleFor("/sales/SL-1042")).toBe("Sales");
     expect(pageTitleFor("/help")).toBe("Help & Support");
+    expect(pageTitleFor("/activity")).toBe("Activity");
     expect(pageTitleFor("/unknown")).toBeNull();
   });
 });

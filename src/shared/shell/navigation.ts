@@ -24,9 +24,12 @@ export function isActive(pathname: string, href: string): boolean {
 
 /** Shell destinations outside the primary navigation. */
 export const HELP_ITEM = { href: "/help", label: "Help & Support", icon: "help_outline" } as const;
+/** Full team activity feed, linked from the overview's activity card and the command palette. */
+export const ACTIVITY_ITEM = { href: "/activity", label: "Activity", icon: "history" } as const;
 
 /** Page name shown in the topbar breadcrumb, or null for routes outside the shell's sections. */
 export function pageTitleFor(pathname: string): string | null {
   if (isActive(pathname, HELP_ITEM.href)) return HELP_ITEM.label;
+  if (isActive(pathname, ACTIVITY_ITEM.href)) return ACTIVITY_ITEM.label;
   return NAV_ITEMS.find((item) => isActive(pathname, item.href))?.label ?? null;
 }

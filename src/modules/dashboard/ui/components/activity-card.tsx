@@ -1,8 +1,8 @@
 import Link from "next/link";
-import { Fragment } from "react";
 import { cn } from "@/shared/lib/cn";
 import { Card } from "@/shared/ui/card";
 import type { ActivityCategory } from "../../../activity/domain/activity";
+import { ActivityMessage } from "../../../activity/ui/activity-message";
 import { LiveSync } from "./live-sync";
 
 export interface ActivityItem {
@@ -20,26 +20,6 @@ const DOT: Record<ActivityCategory, string> = {
   development: "bg-outline",
   operations: "bg-warning",
 };
-
-const REFERENCE = /(#[A-Z]+-\d+)/g;
-
-/** Highlights record references ("#INV-2041") inside an activity sentence. */
-function Message({ text }: { text: string }) {
-  return text.split(REFERENCE).map((part, i) =>
-    i % 2 === 1 ? (
-      <span key={i} className="text-accent">
-        {part}
-      </span>
-    ) : (
-      <Fragment key={i}>{part}</Fragment>
-    ),
-  );
-}
-
-/** Highlights record references ("#INV-2041") inside an activity sentence (shared with /activity). */
-export function ActivityMessage({ text }: { text: string }) {
-  return <Message text={text} />;
-}
 
 export function ActivityCard({ items, renderedAt, viewAllHref }: { items: ReadonlyArray<ActivityItem>; renderedAt: string; viewAllHref: string }) {
   return (
@@ -60,7 +40,7 @@ export function ActivityCard({ items, renderedAt, viewAllHref }: { items: Readon
               <span className={cn("relative mt-1.5 size-2.5 shrink-0 rounded-full", DOT[a.category])} aria-hidden />
               <div className="min-w-0">
                 <p className="text-body-sm text-ink">
-                  <span className="font-semibold">{a.actor}</span> <Message text={a.message} />
+                  <span className="font-semibold">{a.actor}</span> <ActivityMessage text={a.message} />
                 </p>
                 <p className="mt-0.5 text-label-sm text-ink-subtle">{a.meta}</p>
               </div>

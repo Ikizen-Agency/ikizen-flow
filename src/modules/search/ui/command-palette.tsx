@@ -28,6 +28,7 @@ const PAGES: PaletteItem[] = [
   { id: "p-tasks", group: "Go to", label: "Tasks", icon: "check_box", href: "/tasks" },
   { id: "p-invoices", group: "Go to", label: "Invoices", icon: "receipt_long", href: "/invoices" },
   { id: "p-reports", group: "Go to", label: "Reports", icon: "bar_chart", href: "/reports" },
+  { id: "p-activity", group: "Go to", label: "Team activity", icon: "history", href: "/activity" },
   { id: "p-settings", group: "Go to", label: "Settings", icon: "settings", href: "/settings" },
   { id: "p-settings-members", group: "Go to", label: "Settings: Members & invitations", icon: "group_add", href: "/settings?tab=members" },
   { id: "p-settings-profile", group: "Go to", label: "Settings: Profile & password", icon: "person", href: "/settings?tab=profile" },

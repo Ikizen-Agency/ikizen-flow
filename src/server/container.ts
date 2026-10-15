@@ -1,5 +1,5 @@
 import "server-only";
-import { makeListRecentActivity } from "@/modules/activity/application/use-cases";
+import { makeListActivity, makeListRecentActivity } from "@/modules/activity/application/use-cases";
 import { makeGetDashboard, makeSendPaymentReminder } from "@/modules/dashboard/application/use-cases";
 import { DrizzleDashboardRepository } from "@/modules/dashboard/infrastructure/drizzle-dashboard-repository";
 import { DrizzleActivityRepository } from "@/modules/activity/infrastructure/drizzle-activity-repository";
@@ -231,9 +231,12 @@ export function forWorkspace(workspaceId: number) {
     },
     activity: {
       recent: makeListRecentActivity(deps),
+      /** Paginated, filterable feed for /activity. */
+      list: makeListActivity(deps),
     },
     dashboard: {
       overview: makeGetDashboard(deps),
+      /** Emails the customer (kind "reminder"), logs a billing activity and notifies the order's creator. */
       sendReminder: makeSendPaymentReminder(deps),
     },
     notifications: {
