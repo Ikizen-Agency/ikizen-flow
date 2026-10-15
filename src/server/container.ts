@@ -1,5 +1,7 @@
 import "server-only";
 import { makeListRecentActivity } from "@/modules/activity/application/use-cases";
+import { makeGetDashboard, makeSendPaymentReminder } from "@/modules/dashboard/application/use-cases";
+import { DrizzleDashboardRepository } from "@/modules/dashboard/infrastructure/drizzle-dashboard-repository";
 import { DrizzleActivityRepository } from "@/modules/activity/infrastructure/drizzle-activity-repository";
 import {
   makeCreateCustomer,
@@ -41,6 +43,7 @@ const repositories = {
   tasks: new DrizzleTaskRepository(db),
   activity: new DrizzleActivityRepository(db),
   members: new DrizzleMemberRepository(db),
+  dashboard: new DrizzleDashboardRepository(db),
 };
 
 const clock = systemClock;
@@ -81,5 +84,9 @@ export const container = {
   },
   activity: {
     recent: makeListRecentActivity(deps),
+  },
+  dashboard: {
+    overview: makeGetDashboard(deps),
+    sendReminder: makeSendPaymentReminder(deps),
   },
 } as const;
