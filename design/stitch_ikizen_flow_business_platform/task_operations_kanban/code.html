@@ -1,0 +1,846 @@
+<!DOCTYPE html>
+
+<html lang="en"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/><meta content="web_dashboard" name="shell-type"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/><link href="https://fonts.googleapis.com" rel="preconnect"/><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><style>@layer base{html,body{margin:0;padding:0;}body{overscroll-behavior:none;}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = {
+    darkMode: "class",
+    theme: {
+      extend: {
+        "colors": {
+          "error-container": "#ffdad6",
+          "secondary-container": "#82f5c1",
+          "primary-fixed": "#e3dfff",
+          "on-secondary": "#ffffff",
+          "outline-variant": "#c7c4d7",
+          "tertiary-fixed": "#ffdcc3",
+          "surface-container-low": "#f2f3ff",
+          "on-secondary-container": "#00714e",
+          "secondary": "#006c4a",
+          "on-primary-container": "#c1beff",
+          "surface-variant": "#dae2fd",
+          "primary": "#2a14b4",
+          "on-secondary-fixed": "#002114",
+          "surface-container-highest": "#dae2fd",
+          "surface-bright": "#faf8ff",
+          "error": "#ba1a1a",
+          "surface-tint": "#5148d7",
+          "on-primary-fixed-variant": "#372abf",
+          "on-surface": "#131b2e",
+          "inverse-on-surface": "#eef0ff",
+          "surface-container-high": "#e2e7ff",
+          "primary-container": "#4338ca",
+          "on-primary": "#ffffff",
+          "on-secondary-fixed-variant": "#005137",
+          "on-background": "#131b2e",
+          "on-error": "#ffffff",
+          "on-tertiary-fixed-variant": "#6e3900",
+          "secondary-fixed": "#85f8c4",
+          "background": "#faf8ff",
+          "surface-dim": "#d2d9f4",
+          "surface-container-lowest": "#ffffff",
+          "secondary-fixed-dim": "#68dba9",
+          "tertiary-container": "#7d4200",
+          "on-tertiary-container": "#ffb477",
+          "inverse-surface": "#283044",
+          "on-surface-variant": "#464554",
+          "outline": "#777586",
+          "on-primary-fixed": "#100069",
+          "inverse-primary": "#c3c0ff",
+          "on-tertiary-fixed": "#2f1500",
+          "surface-container": "#eaedff",
+          "on-tertiary": "#ffffff",
+          "tertiary": "#5c2f00",
+          "surface": "#faf8ff",
+          "primary-fixed-dim": "#c3c0ff",
+          "tertiary-fixed-dim": "#ffb77d",
+          "on-error-container": "#93000a"
+        },
+        "borderRadius": {
+          "DEFAULT": "0.25rem",
+          "lg": "0.5rem",
+          "xl": "0.75rem",
+          "full": "9999px"
+        },
+        "spacing": {
+          "margin-mobile": "1rem",
+          "space-xl": "2rem",
+          "gutter": "1.5rem",
+          "gutter-mobile": "1rem",
+          "margin": "2rem",
+          "space-xs": "0.25rem",
+          "space-sm": "0.5rem",
+          "space-lg": "1.5rem",
+          "space-md": "1rem"
+        },
+        "fontFamily": {
+          "data-metric": [
+            "Inter"
+          ],
+          "display-lg": [
+            "Inter"
+          ],
+          "headline-lg": [
+            "Inter"
+          ],
+          "label-sm": [
+            "Inter"
+          ],
+          "body-md": [
+            "Inter"
+          ],
+          "data-tabular": [
+            "Inter"
+          ],
+          "headline-md": [
+            "Inter"
+          ],
+          "label-md": [
+            "Inter"
+          ],
+          "headline-sm": [
+            "Inter"
+          ],
+          "body-lg": [
+            "Inter"
+          ],
+          "body-sm": [
+            "Inter"
+          ]
+        },
+        "fontSize": {
+          "data-metric": [
+            "28px",
+            {
+              "lineHeight": "36px",
+              "letterSpacing": "-0.02em",
+              "fontWeight": "600"
+            }
+          ],
+          "display-lg": [
+            "32px",
+            {
+              "lineHeight": "40px",
+              "letterSpacing": "-0.02em",
+              "fontWeight": "600"
+            }
+          ],
+          "headline-lg": [
+            "24px",
+            {
+              "lineHeight": "32px",
+              "letterSpacing": "-0.015em",
+              "fontWeight": "600"
+            }
+          ],
+          "label-sm": [
+            "12px",
+            {
+              "lineHeight": "16px",
+              "fontWeight": "500"
+            }
+          ],
+          "body-md": [
+            "14px",
+            {
+              "lineHeight": "20px",
+              "fontWeight": "400"
+            }
+          ],
+          "data-tabular": [
+            "14px",
+            {
+              "lineHeight": "20px",
+              "fontWeight": "400"
+            }
+          ],
+          "headline-md": [
+            "20px",
+            {
+              "lineHeight": "28px",
+              "letterSpacing": "-0.01em",
+              "fontWeight": "600"
+            }
+          ],
+          "label-md": [
+            "14px",
+            {
+              "lineHeight": "20px",
+              "fontWeight": "500"
+            }
+          ],
+          "headline-sm": [
+            "16px",
+            {
+              "lineHeight": "24px",
+              "letterSpacing": "-0.005em",
+              "fontWeight": "600"
+            }
+          ],
+          "body-lg": [
+            "16px",
+            {
+              "lineHeight": "24px",
+              "fontWeight": "400"
+            }
+          ],
+          "body-sm": [
+            "12px",
+            {
+              "lineHeight": "16px",
+              "fontWeight": "400"
+            }
+          ]
+        }
+      },
+    },
+  }</script></head><body class="bg-background font-body-md text-body-md text-on-surface antialiased"><aside class="fixed left-0 top-0 h-screen w-64 bg-surface-container-lowest z-50 flex flex-col justify-between shadow-[0_1px_8px_rgba(0,0,0,0.04)]"><div class="flex flex-col flex-1 min-h-0"><div class="p-space-md pb-space-sm"><div class="flex items-center gap-space-sm mb-space-sm"><img alt="Ikizen Flow Logo" class="h-8 w-auto object-contain" src="https://lh3.googleusercontent.com/aida/AEtjO1VqMoAEWGNNjXJfEGcuSvGFEtw2A_MMh19m6blWNCZU2EXXMnjNUVF_genkbbj3dlqZ_G9DLVlXq4IybS0jg5QdQpgLJdW6VWsAitEVaxfiCks9PhDHTuZ9KE_CLBN5F2xKMRHXa2p7yV076sWD5JoqDgyxYMje-TSAg-H4RJx7xI-bvYuxl8F9yfFBPWsO7P9U2o3dNlkcPQSiVTcZEW9ne-rRME9hlcWmvnGlAa4aaGH9Twj8kpxvK1U"/><span class="font-headline-sm text-headline-sm text-on-surface tracking-tight">Ikizen Flow</span></div><button class="w-full flex items-center justify-between p-space-sm bg-surface-container-low hover:bg-surface-container rounded-lg text-left transition-colors" type="button"><div class="flex flex-col min-w-0 pr-space-xs"><span class="font-label-md text-label-md text-on-surface truncate">Northstar Studio</span><span class="font-label-sm text-label-sm text-on-surface-variant truncate">Digital Operations</span></div><span class="material-symbols-outlined text-outline text-[18px]">unfold_more</span></button></div><nav class="flex-1 px-space-md py-space-xs space-y-space-xs overflow-y-auto" data-active-classes="bg-primary text-on-primary font-label-md"><a class="flex items-center gap-space-sm px-space-sm py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors font-body-md text-body-md" data-path="overview" href="#"><span class="material-symbols-outlined text-[20px]">dashboard</span><span>Overview</span></a><a class="flex items-center gap-space-sm px-space-sm py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors font-body-md text-body-md" data-path="customers" href="#"><span class="material-symbols-outlined text-[20px]">group</span><span>Customers</span></a><a class="flex items-center gap-space-sm px-space-sm py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors font-body-md text-body-md" data-path="sales" href="#"><span class="material-symbols-outlined text-[20px]">trending_up</span><span>Sales</span></a><a aria-current="page" class="flex items-center gap-space-sm px-space-sm py-space-sm rounded-lg transition-colors bg-primary text-on-primary font-label-md" data-path="tasks" href="#"><span class="material-symbols-outlined text-[20px]">check_box</span><span>Tasks</span></a><a class="flex items-center gap-space-sm px-space-sm py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors font-body-md text-body-md" data-path="invoices" href="#"><span class="material-symbols-outlined text-[20px]">receipt_long</span><span>Invoices</span></a><a class="flex items-center gap-space-sm px-space-sm py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors font-body-md text-body-md" data-path="reports" href="#"><span class="material-symbols-outlined text-[20px]">bar_chart</span><span>Reports</span></a><a class="flex items-center gap-space-sm px-space-sm py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors font-body-md text-body-md" data-path="settings" href="#"><span class="material-symbols-outlined text-[20px]">settings</span><span>Settings</span></a></nav></div><div class="p-space-md space-y-space-sm"><a class="flex items-center gap-space-sm px-space-sm py-space-xs rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors font-label-md text-label-md" data-path="documentation-and-support" href="#"><span class="material-symbols-outlined text-[18px]">help_outline</span><span>Documentation &amp; Support</span></a><div class="p-space-sm rounded-lg bg-surface-container-low flex items-center justify-between"><div class="flex items-center gap-space-sm min-w-0"><img alt="Profile" class="w-8 h-8 rounded-full object-cover flex-shrink-0" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCBh6xqNctDedw-80QJu3e2msNY_cflGpeiLAGJ0nyhNmZXOsxexVRmm9I8GK8N4Ew0Xc79G_hM-N_lEV--ikPSmKPK5WnroEjKlqFuDd8Qhe_0jxznLwNNogjR7eY-gAeuUVCbXbREL8UXk4-vBBXiuQfx3KBm03mfPS2EQ46XzPXeB5Pt6dxpxe83ALuJYVZSrSYXNjWL7EIdjtmqgg6u6fdHf6WqPfdaBwF_dtCM4CWaXG4c7qMp"/><div class="flex flex-col min-w-0"><span class="font-label-md text-label-md text-on-surface truncate">Alex Vance</span><span class="font-label-sm text-label-sm text-on-surface-variant truncate">Operations Manager</span></div></div><div class="flex items-center gap-space-xs"><button class="text-outline hover:text-on-surface p-space-xs rounded transition-colors" title="Switch Workspace" type="button"><span class="material-symbols-outlined text-[18px]">swap_horiz</span></button><button class="text-outline hover:text-error p-space-xs rounded transition-colors" title="Logout" type="button"><span class="material-symbols-outlined text-[18px]">logout</span></button></div></div></div></aside><div class="pl-64"><header class="fixed top-0 left-64 right-0 h-16 bg-surface-container-lowest/90 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.04)] z-40"><div class="h-16 w-full px-space-lg flex items-center justify-between gap-space-md"><div class="flex items-center gap-space-sm"><span class="font-label-md text-label-md text-on-surface-variant">Workspace</span><span class="text-outline font-body-sm text-body-sm">/</span><span class="font-headline-sm text-headline-sm text-on-surface">Northstar Operations</span></div><div class="flex-1 max-w-md mx-space-md"><div class="relative flex items-center w-full"><span class="material-symbols-outlined absolute left-space-sm text-outline text-[18px] pointer-events-none">search</span><input class="w-full h-[38px] pl-9 pr-14 bg-surface-container-low text-on-surface placeholder:text-outline rounded-lg text-body-sm font-body-sm focus:outline-none focus:bg-surface-container-lowest focus:ring-2 focus:ring-primary-container transition-all" placeholder="Search workspace, orders, clients..." type="text"/><kbd class="absolute right-space-sm px-1.5 py-0.5 text-[10px] font-label-sm text-outline bg-surface-container rounded">⌘K</kbd></div></div><div class="flex items-center gap-space-md"><button class="relative p-space-xs text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low rounded-lg transition-colors" title="Notifications" type="button"><span class="material-symbols-outlined text-[20px]">notifications</span><span class="absolute top-1 right-1 w-2 h-2 rounded-full bg-primary ring-2 ring-surface-container-lowest"></span></button><button class="h-[36px] px-space-md bg-primary-container hover:bg-primary text-on-primary rounded-lg font-label-md text-label-md flex items-center gap-space-xs transition-colors shadow-sm" type="button"><span class="material-symbols-outlined text-[18px]">add</span><span>Create New</span></button><div class="flex items-center gap-space-xs pl-space-xs"><img alt="Profile" class="w-8 h-8 rounded-full object-cover ring-1 ring-surface-container" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCBh6xqNctDedw-80QJu3e2msNY_cflGpeiLAGJ0nyhNmZXOsxexVRmm9I8GK8N4Ew0Xc79G_hM-N_lEV--ikPSmKPK5WnroEjKlqFuDd8Qhe_0jxznLwNNogjR7eY-gAeuUVCbXbREL8UXk4-vBBXiuQfx3KBm03mfPS2EQ46XzPXeB5Pt6dxpxe83ALuJYVZSrSYXNjWL7EIdjtmqgg6u6fdHf6WqPfdaBwF_dtCM4CWaXG4c7qMp"/></div></div></div></header><main class="w-full pt-16 bg-background min-h-screen"><div class="flex flex-col w-full">
+<div class="px-space-lg py-space-md flex flex-col gap-space-lg max-w-[1560px] mx-auto w-full">
+<!-- Top Operational Bar -->
+<div class="flex flex-col lg:flex-row lg:items-center justify-between gap-space-md">
+<div class="flex flex-col gap-1">
+<div class="flex items-center gap-space-sm flex-wrap">
+<span class="font-headline-lg text-headline-lg text-on-surface tracking-tight">Tasks &amp; Operations</span>
+<span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-error-container text-on-error-container font-label-sm text-label-sm shadow-sm">
+<span class="w-1.5 h-1.5 rounded-full bg-error animate-pulse"></span>
+            24 Active Tasks <span class="opacity-60">|</span> 7 Requiring Attention
+          </span>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant">Active operational sprints across Northstar Studio client accounts</p>
+</div>
+<div class="flex items-center gap-space-sm flex-wrap">
+<!-- View Toggle Segmented Control -->
+<div class="inline-flex p-1 rounded-lg bg-surface-container shadow-inner">
+<button class="px-3 py-1.5 rounded-md font-label-md text-label-md bg-surface-container-lowest text-primary-container shadow-sm flex items-center gap-1.5 transition-all" id="view-btn-kanban" type="button">
+<span class="material-symbols-outlined text-[18px]">view_kanban</span>
+<span>Kanban Board</span>
+</button>
+<button class="px-3 py-1.5 rounded-md font-label-md text-label-md text-on-surface-variant hover:text-on-surface flex items-center gap-1.5 transition-all" id="view-btn-list" type="button">
+<span class="material-symbols-outlined text-[18px]">format_list_bulleted</span>
+<span>List View</span>
+</button>
+</div>
+<button class="h-9 px-space-md bg-primary-container hover:bg-primary text-on-primary rounded-lg font-label-md text-label-md flex items-center gap-space-xs transition-all shadow-sm" id="open-create-task" type="button">
+<span class="material-symbols-outlined text-[18px]">add</span>
+<span>Create Task</span>
+</button>
+</div>
+</div>
+<!-- Filter Strip -->
+<div class="flex flex-wrap items-center justify-between gap-space-md p-space-sm rounded-xl bg-surface-container-lowest shadow-sm">
+<div class="flex flex-wrap items-center gap-space-md">
+<!-- Assignee Avatar Selector -->
+<div class="flex items-center gap-space-xs">
+<span class="font-label-sm text-label-sm text-outline uppercase tracking-wider mr-1">Assignees</span>
+<div class="flex items-center -space-x-1.5">
+<button class="group relative rounded-full focus:outline-none" title="Filter by Alex Vance" type="button">
+<img alt="Alex Vance" class="w-7 h-7 rounded-full object-cover shadow-sm group-hover:scale-105 transition-transform" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCBh6xqNctDedw-80QJu3e2msNY_cflGpeiLAGJ0nyhNmZXOsxexVRmm9I8GK8N4Ew0Xc79G_hM-N_lEV--ikPSmKPK5WnroEjKlqFuDd8Qhe_0jxznLwNNogjR7eY-gAeuUVCbXbREL8UXk4-vBBXiuQfx3KBm03mfPS2EQ46XzPXeB5Pt6dxpxe83ALuJYVZSrSYXNjWL7EIdjtmqgg6u6fdHf6WqPfdaBwF_dtCM4CWaXG4c7qMp"/>
+<span class="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-secondary"></span>
+</button>
+<button class="group relative rounded-full focus:outline-none" title="Filter by Maya Chen" type="button">
+<img class="w-7 h-7 rounded-full object-cover shadow-sm group-hover:scale-105 transition-transform" data-alt="Close-up professional portrait of Maya Chen, an Asian female operations lead with sharp spectacles, minimal lighting, confident demeanor, neutral corporate tech backdrop" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDKHwM3O2xoCgbj-NoT6eJJjQ5eLwkxwvbTYIuJK1s63uEb5jefC4FSg1tLvR8OZEGal6-vobXaXYjIXWfMB_BVKL7iiuOxeBA5EwnWZeBRaNm-ZW_-3iC8m945YNhg47bBa0BMIA5JUZWqXZRWNDURtudQwywKnCPaX2_GQ8xrCNvUE_M_EBlZF87bObOI7ENYNqpu2uqr0-nBynaBk5GN2-uxVDJ6W9Ly4fALuU0bLY4Dy9K6fx6k"/>
+</button>
+<button class="group relative rounded-full focus:outline-none" title="Filter by Marcus Thorne" type="button">
+<img class="w-7 h-7 rounded-full object-cover shadow-sm group-hover:scale-105 transition-transform" data-alt="Portrait of Marcus Thorne, creative director with short cropped hair and stylish modern black turtle neck, softly lit editorial lighting, sleek studio ambiance" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDCYOEL7nCNMEddEh49wJUJHcF9IgW0K7V9Fdt10DPQ913a0kH0D1K7OpGXXl8SD1xW6cyEwxQPEv5d4kDBWeIwliPR9UWnqZikzjt1HDk_tArNdFHUuGWUlbNYY_sHdw5Vlf6TBdCV7ZHSwt722SVuT2jOxOAmF60vK5W4Hs0SlMOoaT80BLjBuaJ752B3XNMirwZJIA_iRxMqyxHeuEtO89ewsN0BKgz5tfOCv42T8-vBAIqTk1Td"/>
+</button>
+<button class="group relative rounded-full focus:outline-none" title="Filter by Liam Scott" type="button">
+<img class="w-7 h-7 rounded-full object-cover shadow-sm group-hover:scale-105 transition-transform" data-alt="Warm studio headshot of Liam Scott, senior backend engineer, gentle natural daylighting, relaxed professional expression in casual navy shirt" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAsEUdfTuVSO2ik1shIDSq2jkjmHwFv8jPTSer781j1ZxD3znBfkdA5PG9WBfR2azDRT0gtfTVAaP99Qt_pNZxc-Q6gFCfshxArmZRkylqcHa567Hi2ecbHI5i_OpLYkbBomi3-SM-LsLb3UlIuD6b8VuDqjb5EUy5nZb5br-zMFlRDe8bxTslz_D5kVPjvcfWcyufqCvOKzVmRBKo3Tl4so1ZyON5QvoTHAgnTOQI_g4ShnxFwk-lQ"/>
+</button>
+</div>
+<span class="text-xs text-on-surface-variant font-label-sm ml-1.5">All Members</span>
+</div>
+<div class="h-5 w-px bg-surface-container"></div>
+<!-- Priority Select -->
+<div class="flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[16px] text-outline">flag</span>
+<select class="bg-surface-container-low text-on-surface rounded-lg font-label-sm text-label-sm px-2.5 py-1.5 focus:outline-none focus:bg-surface-container-lowest transition-colors">
+<option>All Priorities</option>
+<option>Urgent (Rose)</option>
+<option>High (Amber)</option>
+<option>Medium</option>
+<option>Low</option>
+</select>
+</div>
+<!-- Client Select -->
+<div class="flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[16px] text-outline">domain</span>
+<select class="bg-surface-container-low text-on-surface rounded-lg font-label-sm text-label-sm px-2.5 py-1.5 focus:outline-none focus:bg-surface-container-lowest transition-colors">
+<option>All Clients &amp; Workspaces</option>
+<option>BlueWave Logistics</option>
+<option>Apex Digital</option>
+<option>Hyperion Media</option>
+<option>Lumina Health</option>
+<option>Internal Studio</option>
+</select>
+</div>
+<!-- Due Date Quick Picker -->
+<div class="flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[16px] text-outline">calendar_today</span>
+<button class="bg-surface-container-low hover:bg-surface-container text-on-surface rounded-lg font-label-sm text-label-sm px-2.5 py-1.5 flex items-center gap-1 transition-colors" type="button">
+<span>Due: Next 7 Days</span>
+<span class="material-symbols-outlined text-[14px] text-outline">expand_more</span>
+</button>
+</div>
+</div>
+<!-- Quick Metrics Summary Pills -->
+<div class="flex items-center gap-2">
+<span class="font-label-sm text-label-sm px-2 py-1 rounded bg-surface-container text-on-surface-variant flex items-center gap-1">
+<span class="w-2 h-2 rounded-full bg-error"></span>
+          2 Critical Blockers
+        </span>
+<button class="p-1.5 rounded-lg text-outline hover:text-on-surface hover:bg-surface-container-low transition-colors" title="Clear Filters" type="button">
+<span class="material-symbols-outlined text-[18px]">restart_alt</span>
+</button>
+</div>
+</div>
+<!-- MAIN VIEW CONTAINER -->
+<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-space-md items-start" id="view-kanban">
+<!-- ==================== COLUMN 1: TO DO ==================== -->
+<div class="flex flex-col gap-space-sm bg-surface-container-low/70 rounded-xl p-space-sm">
+<div class="flex items-center justify-between px-2 py-1">
+<div class="flex items-center gap-2">
+<span class="w-2.5 h-2.5 rounded-full bg-outline"></span>
+<h3 class="font-headline-sm text-headline-sm text-on-surface tracking-tight">TO DO</h3>
+<span class="font-label-sm text-label-sm px-2 py-0.5 rounded-full bg-surface-container text-on-surface-variant">4</span>
+</div>
+<button class="text-outline hover:text-on-surface p-1 rounded hover:bg-surface-container transition-colors" type="button">
+<span class="material-symbols-outlined text-[18px]">add</span>
+</button>
+</div>
+<!-- Cards Stack -->
+<div class="flex flex-col gap-space-sm">
+<!-- Card 1.1 -->
+<div class="group p-3.5 bg-surface-container-lowest rounded-xl shadow-sm hover:shadow-md cursor-pointer transition-all flex flex-col gap-2.5" onclick="openTaskDetail('Prepare SOC2 Compliance Evidence for BlueWave', 'BlueWave Logistics', 'High', 'Tomorrow', 'Alex Vance', '2/5', 'active')">
+<div class="flex items-center justify-between gap-2">
+<span class="font-label-sm text-label-sm px-2 py-0.5 rounded bg-primary/10 text-primary font-medium">BlueWave Logistics</span>
+<span class="font-label-sm text-label-sm px-2 py-0.5 rounded bg-tertiary-fixed text-on-tertiary-fixed font-medium flex items-center gap-1">
+<span class="material-symbols-outlined text-[13px]">flag</span> High
+              </span>
+</div>
+<h4 class="font-headline-sm text-headline-sm text-on-surface group-hover:text-primary transition-colors leading-snug">Prepare SOC2 Compliance Evidence for BlueWave</h4>
+<div class="flex items-center justify-between pt-1 font-body-sm text-body-sm text-on-surface-variant">
+<div class="flex items-center gap-3">
+<span class="flex items-center gap-1 text-tertiary-container font-medium">
+<span class="material-symbols-outlined text-[15px]">schedule</span> Tomorrow
+                </span>
+<span class="flex items-center gap-1">
+<span class="material-symbols-outlined text-[15px] text-outline">checklist</span> 2/5
+                </span>
+</div>
+<img alt="Alex Vance" class="w-6 h-6 rounded-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCBh6xqNctDedw-80QJu3e2msNY_cflGpeiLAGJ0nyhNmZXOsxexVRmm9I8GK8N4Ew0Xc79G_hM-N_lEV--ikPSmKPK5WnroEjKlqFuDd8Qhe_0jxznLwNNogjR7eY-gAeuUVCbXbREL8UXk4-vBBXiuQfx3KBm03mfPS2EQ46XzPXeB5Pt6dxpxe83ALuJYVZSrSYXNjWL7EIdjtmqgg6u6fdHf6WqPfdaBwF_dtCM4CWaXG4c7qMp"/>
+</div>
+</div>
+<!-- Card 1.2 -->
+<div class="group p-3.5 bg-surface-container-lowest rounded-xl shadow-sm hover:shadow-md cursor-pointer transition-all flex flex-col gap-2.5" onclick="openTaskDetail('Draft API Documentation for Mobile SDK', 'Apex Digital', 'Medium', 'Nov 3', 'Maya Chen', '0/3', 'active')">
+<div class="flex items-center justify-between gap-2">
+<span class="font-label-sm text-label-sm px-2 py-0.5 rounded bg-secondary-fixed text-on-secondary-fixed font-medium">Apex Digital</span>
+<span class="font-label-sm text-label-sm px-2 py-0.5 rounded bg-surface-container text-on-surface-variant font-medium">Medium</span>
+</div>
+<h4 class="font-headline-sm text-headline-sm text-on-surface group-hover:text-primary transition-colors leading-snug">Draft API Documentation for Mobile SDK</h4>
+<div class="flex items-center justify-between pt-1 font-body-sm text-body-sm text-on-surface-variant">
+<div class="flex items-center gap-3">
+<span class="flex items-center gap-1">
+<span class="material-symbols-outlined text-[15px] text-outline">event</span> Nov 3
+                </span>
+<span class="flex items-center gap-1">
+<span class="material-symbols-outlined text-[15px] text-outline">checklist</span> 0/3
+                </span>
+</div>
+<div class="w-6 h-6 rounded-full bg-primary-fixed text-on-primary-fixed flex items-center justify-center font-label-sm text-label-sm font-semibold">MC</div>
+</div>
+</div>
+<!-- Card 1.3 -->
+<div class="group p-3.5 bg-surface-container-lowest rounded-xl shadow-sm hover:shadow-md cursor-pointer transition-all flex flex-col gap-2.5" onclick="openTaskDetail('Update Figma Design System tokens', 'Internal Studio', 'Low', 'Nov 8', 'Marcus', '0/4', 'active')">
+<div class="flex items-center justify-between gap-2">
+<span class="font-label-sm text-label-sm px-2 py-0.5 rounded bg-surface-variant text-on-surface-variant font-medium">Internal Studio</span>
+<span class="font-label-sm text-label-sm px-2 py-0.5 rounded bg-surface-container text-outline font-medium">Low</span>
+</div>
+<h4 class="font-headline-sm text-headline-sm text-on-surface group-hover:text-primary transition-colors leading-snug">Update Figma Design System tokens</h4>
+<div class="flex items-center justify-between pt-1 font-body-sm text-body-sm text-on-surface-variant">
+<div class="flex items-center gap-3">
+<span class="flex items-center gap-1">
+<span class="material-symbols-outlined text-[15px] text-outline">event</span> Nov 8
+                </span>
+</div>
+<div class="w-6 h-6 rounded-full bg-secondary-fixed text-on-secondary-fixed flex items-center justify-center font-label-sm text-label-sm font-semibold">MT</div>
+</div>
+</div>
+</div>
+</div>
+<!-- ==================== COLUMN 2: IN PROGRESS ==================== -->
+<div class="flex flex-col gap-space-sm bg-surface-container-low/70 rounded-xl p-space-sm">
+<div class="flex items-center justify-between px-2 py-1">
+<div class="flex items-center gap-2">
+<span class="w-2.5 h-2.5 rounded-full bg-primary"></span>
+<h3 class="font-headline-sm text-headline-sm text-on-surface tracking-tight">IN PROGRESS</h3>
+<span class="font-label-sm text-label-sm px-2 py-0.5 rounded-full bg-surface-container text-on-surface-variant">8</span>
+</div>
+<button class="text-outline hover:text-on-surface p-1 rounded hover:bg-surface-container transition-colors" type="button">
+<span class="material-symbols-outlined text-[18px]">add</span>
+</button>
+</div>
+<div class="flex flex-col gap-space-sm">
+<!-- Card 2.1 (Urgent Focal Task) -->
+<div class="group p-3.5 bg-surface-container-lowest rounded-xl shadow-sm hover:shadow-md cursor-pointer transition-all flex flex-col gap-2.5" onclick="openTaskDetail('Deliver Q4 UX Architecture Wireframes', 'Apex Digital', 'Urgent', 'Today, 5:00 PM', 'Alex Vance', '8/10', 'urgent')">
+<div class="flex items-center justify-between gap-2">
+<span class="font-label-sm text-label-sm px-2 py-0.5 rounded bg-secondary-fixed text-on-secondary-fixed font-medium">Apex Digital</span>
+<span class="font-label-sm text-label-sm px-2 py-0.5 rounded bg-error-container text-on-error-container font-semibold flex items-center gap-1">
+<span class="material-symbols-outlined text-[13px]">priority_high</span> Urgent
+              </span>
+</div>
+<h4 class="font-headline-sm text-headline-sm text-on-surface group-hover:text-primary transition-colors leading-snug">Deliver Q4 UX Architecture Wireframes</h4>
+<!-- Progress Micro Visual -->
+<div class="w-full bg-surface-container-high rounded-full h-1.5 overflow-hidden">
+<div class="bg-primary h-full rounded-full" style="width: 80%"></div>
+</div>
+<div class="flex items-center justify-between pt-1 font-body-sm text-body-sm text-on-surface-variant">
+<div class="flex items-center gap-3">
+<span class="flex items-center gap-1 text-error font-medium">
+<span class="material-symbols-outlined text-[15px]">alarm</span> Today, 5:00 PM
+                </span>
+<span class="flex items-center gap-1">
+<span class="material-symbols-outlined text-[15px] text-outline">chat_bubble</span> 4
+                </span>
+<span class="flex items-center gap-1">
+<span class="material-symbols-outlined text-[15px] text-outline">checklist</span> 8/10
+                </span>
+</div>
+<img alt="Alex Vance" class="w-6 h-6 rounded-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCBh6xqNctDedw-80QJu3e2msNY_cflGpeiLAGJ0nyhNmZXOsxexVRmm9I8GK8N4Ew0Xc79G_hM-N_lEV--ikPSmKPK5WnroEjKlqFuDd8Qhe_0jxznLwNNogjR7eY-gAeuUVCbXbREL8UXk4-vBBXiuQfx3KBm03mfPS2EQ46XzPXeB5Pt6dxpxe83ALuJYVZSrSYXNjWL7EIdjtmqgg6u6fdHf6WqPfdaBwF_dtCM4CWaXG4c7qMp"/>
+</div>
+</div>
+<!-- Card 2.2 -->
+<div class="group p-3.5 bg-surface-container-lowest rounded-xl shadow-sm hover:shadow-md cursor-pointer transition-all flex flex-col gap-2.5" onclick="openTaskDetail('Deploy Staging Environment Kubernetes Cluster', 'Lumina Health', 'High', 'Oct 28', 'Liam', '5/6', 'active')">
+<div class="flex items-center justify-between gap-2">
+<span class="font-label-sm text-label-sm px-2 py-0.5 rounded bg-primary-fixed text-on-primary-fixed font-medium">Lumina Health</span>
+<span class="font-label-sm text-label-sm px-2 py-0.5 rounded bg-tertiary-fixed text-on-tertiary-fixed font-medium">High</span>
+</div>
+<h4 class="font-headline-sm text-headline-sm text-on-surface group-hover:text-primary transition-colors leading-snug">Deploy Staging Environment Kubernetes Cluster</h4>
+<div class="flex items-center justify-between pt-1 font-body-sm text-body-sm text-on-surface-variant">
+<div class="flex items-center gap-3">
+<span class="flex items-center gap-1">
+<span class="material-symbols-outlined text-[15px] text-outline">event</span> Oct 28
+                </span>
+<span class="flex items-center gap-1">
+<span class="material-symbols-outlined text-[15px] text-outline">chat_bubble</span> 2
+                </span>
+</div>
+<div class="w-6 h-6 rounded-full bg-secondary-fixed text-on-secondary-fixed flex items-center justify-center font-label-sm text-label-sm font-semibold">LS</div>
+</div>
+</div>
+<!-- Card 2.3 -->
+<div class="group p-3.5 bg-surface-container-lowest rounded-xl shadow-sm hover:shadow-md cursor-pointer transition-all flex flex-col gap-2.5" onclick="openTaskDetail('Quarterly Financial Audit Reconciliation', 'Internal Studio', 'Medium', 'Oct 30', 'Maya', '3/8', 'active')">
+<div class="flex items-center justify-between gap-2">
+<span class="font-label-sm text-label-sm px-2 py-0.5 rounded bg-surface-variant text-on-surface-variant font-medium">Internal Studio</span>
+<span class="font-label-sm text-label-sm px-2 py-0.5 rounded bg-surface-container text-on-surface-variant font-medium">Medium</span>
+</div>
+<h4 class="font-headline-sm text-headline-sm text-on-surface group-hover:text-primary transition-colors leading-snug">Quarterly Financial Audit Reconciliation</h4>
+<div class="flex items-center justify-between pt-1 font-body-sm text-body-sm text-on-surface-variant">
+<div class="flex items-center gap-3">
+<span class="flex items-center gap-1">
+<span class="material-symbols-outlined text-[15px] text-outline">event</span> Oct 30
+                </span>
+</div>
+<div class="w-6 h-6 rounded-full bg-primary-fixed text-on-primary-fixed flex items-center justify-center font-label-sm text-label-sm font-semibold">MC</div>
+</div>
+</div>
+</div>
+</div>
+<!-- ==================== COLUMN 3: BLOCKED / PENDING ==================== -->
+<div class="flex flex-col gap-space-sm bg-surface-container-low/70 rounded-xl p-space-sm">
+<div class="flex items-center justify-between px-2 py-1">
+<div class="flex items-center gap-2">
+<span class="w-2.5 h-2.5 rounded-full bg-error"></span>
+<h3 class="font-headline-sm text-headline-sm text-on-surface tracking-tight">BLOCKED / PENDING</h3>
+<span class="font-label-sm text-label-sm px-2 py-0.5 rounded-full bg-error-container text-on-error-container font-semibold">3</span>
+</div>
+<button class="text-outline hover:text-on-surface p-1 rounded hover:bg-surface-container transition-colors" type="button">
+<span class="material-symbols-outlined text-[18px]">add</span>
+</button>
+</div>
+<div class="flex flex-col gap-space-sm">
+<!-- Card 3.1 -->
+<div class="group p-3.5 bg-surface-container-lowest rounded-xl shadow-sm hover:shadow-md cursor-pointer transition-all flex flex-col gap-2.5" onclick="openTaskDetail('Brand Guideline Approval &amp; Asset Sign-off', 'Hyperion Media', 'Urgent', '2 days overdue', 'Alex Vance', '1/3', 'blocked')">
+<div class="flex items-center justify-between gap-2 flex-wrap">
+<span class="font-label-sm text-label-sm px-2 py-0.5 rounded bg-tertiary-fixed text-on-tertiary-fixed font-medium">Hyperion Media</span>
+<span class="font-label-sm text-label-sm px-2 py-0.5 rounded bg-error-container text-on-error-container font-semibold">Urgent</span>
+</div>
+<div class="inline-flex items-center gap-1.5 px-2 py-1 rounded bg-surface-container-high text-on-surface text-label-sm font-label-sm">
+<span class="material-symbols-outlined text-[14px] text-error">pause_circle</span>
+<span>Waiting on client sign-off</span>
+</div>
+<h4 class="font-headline-sm text-headline-sm text-on-surface group-hover:text-primary transition-colors leading-snug">Brand Guideline Approval &amp; Asset Sign-off</h4>
+<div class="flex items-center justify-between pt-1 font-body-sm text-body-sm text-on-surface-variant">
+<span class="flex items-center gap-1 text-error font-semibold">
+<span class="material-symbols-outlined text-[15px]">warning</span> 2 days overdue
+              </span>
+<img alt="Alex Vance" class="w-6 h-6 rounded-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCBh6xqNctDedw-80QJu3e2msNY_cflGpeiLAGJ0nyhNmZXOsxexVRmm9I8GK8N4Ew0Xc79G_hM-N_lEV--ikPSmKPK5WnroEjKlqFuDd8Qhe_0jxznLwNNogjR7eY-gAeuUVCbXbREL8UXk4-vBBXiuQfx3KBm03mfPS2EQ46XzPXeB5Pt6dxpxe83ALuJYVZSrSYXNjWL7EIdjtmqgg6u6fdHf6WqPfdaBwF_dtCM4CWaXG4c7qMp"/>
+</div>
+</div>
+<!-- Card 3.2 -->
+<div class="group p-3.5 bg-surface-container-lowest rounded-xl shadow-sm hover:shadow-md cursor-pointer transition-all flex flex-col gap-2.5" onclick="openTaskDetail('Stripe Connect Merchant Verification', 'Vanguard Fintech', 'High', 'Pending Stripe Review', 'Liam', '2/4', 'blocked')">
+<div class="flex items-center justify-between gap-2">
+<span class="font-label-sm text-label-sm px-2 py-0.5 rounded bg-surface-variant text-on-surface-variant font-medium">Vanguard Fintech</span>
+<span class="font-label-sm text-label-sm px-2 py-0.5 rounded bg-tertiary-fixed text-on-tertiary-fixed font-medium">High</span>
+</div>
+<div class="inline-flex items-center gap-1.5 px-2 py-1 rounded bg-surface-container-high text-on-surface text-label-sm font-label-sm">
+<span class="material-symbols-outlined text-[14px] text-tertiary">hourglass_top</span>
+<span>Pending Stripe review</span>
+</div>
+<h4 class="font-headline-sm text-headline-sm text-on-surface group-hover:text-primary transition-colors leading-snug">Stripe Connect Merchant Verification</h4>
+<div class="flex items-center justify-between pt-1 font-body-sm text-body-sm text-on-surface-variant">
+<span class="flex items-center gap-1 text-on-surface-variant">
+<span class="material-symbols-outlined text-[15px] text-outline">update</span> Oct 25
+              </span>
+<div class="w-6 h-6 rounded-full bg-secondary-fixed text-on-secondary-fixed flex items-center justify-center font-label-sm text-label-sm font-semibold">LS</div>
+</div>
+</div>
+</div>
+</div>
+<!-- ==================== COLUMN 4: COMPLETED ==================== -->
+<div class="flex flex-col gap-space-sm bg-surface-container-low/70 rounded-xl p-space-sm">
+<div class="flex items-center justify-between px-2 py-1">
+<div class="flex items-center gap-2">
+<span class="w-2.5 h-2.5 rounded-full bg-secondary"></span>
+<h3 class="font-headline-sm text-headline-sm text-on-surface tracking-tight">COMPLETED</h3>
+<span class="font-label-sm text-label-sm px-2 py-0.5 rounded-full bg-secondary-fixed text-on-secondary-fixed font-semibold">9</span>
+</div>
+<button class="text-outline hover:text-on-surface p-1 rounded hover:bg-surface-container transition-colors" type="button">
+<span class="material-symbols-outlined text-[18px]">done_all</span>
+</button>
+</div>
+<div class="flex flex-col gap-space-sm opacity-85 hover:opacity-100 transition-opacity">
+<!-- Card 4.1 -->
+<div class="group p-3.5 bg-surface-container-lowest rounded-xl shadow-sm hover:shadow-md cursor-pointer transition-all flex flex-col gap-2.5" onclick="openTaskDetail('Client Onboarding &amp; Slack Connect Room Setup', 'Apex Digital', 'Completed', 'Yesterday', 'Maya Chen', '4/4', 'done')">
+<div class="flex items-center justify-between gap-2">
+<span class="font-label-sm text-label-sm px-2 py-0.5 rounded bg-secondary-fixed text-on-secondary-fixed font-medium">Apex Digital</span>
+<span class="font-label-sm text-label-sm px-2 py-0.5 rounded bg-secondary-container text-on-secondary-container font-medium flex items-center gap-1">
+<span class="material-symbols-outlined text-[13px]">check_circle</span> Done
+              </span>
+</div>
+<h4 class="font-headline-sm text-headline-sm text-on-surface-variant line-through group-hover:text-primary transition-colors leading-snug">Client Onboarding &amp; Slack Connect Room Setup</h4>
+<div class="flex items-center justify-between pt-1 font-body-sm text-body-sm text-on-surface-variant">
+<span class="flex items-center gap-1 text-secondary font-medium">
+<span class="material-symbols-outlined text-[15px]">event_available</span> Completed yesterday
+              </span>
+<div class="w-6 h-6 rounded-full bg-primary-fixed text-on-primary-fixed flex items-center justify-center font-label-sm text-label-sm font-semibold">MC</div>
+</div>
+</div>
+<!-- Card 4.2 -->
+<div class="group p-3.5 bg-surface-container-lowest rounded-xl shadow-sm hover:shadow-md cursor-pointer transition-all flex flex-col gap-2.5" onclick="openTaskDetail('Invoice #INV-2039 Reconciliation', 'Internal Studio', 'Completed', 'Oct 22', 'Alex Vance', '2/2', 'done')">
+<div class="flex items-center justify-between gap-2">
+<span class="font-label-sm text-label-sm px-2 py-0.5 rounded bg-surface-variant text-on-surface-variant font-medium">Internal Studio</span>
+<span class="font-label-sm text-label-sm px-2 py-0.5 rounded bg-secondary-container text-on-secondary-container font-medium flex items-center gap-1">
+<span class="material-symbols-outlined text-[13px]">check_circle</span> Done
+              </span>
+</div>
+<h4 class="font-headline-sm text-headline-sm text-on-surface-variant line-through group-hover:text-primary transition-colors leading-snug">Invoice #INV-2039 Reconciliation</h4>
+<div class="flex items-center justify-between pt-1 font-body-sm text-body-sm text-on-surface-variant">
+<span class="flex items-center gap-1 text-secondary font-medium">
+<span class="material-symbols-outlined text-[15px]">event_available</span> Completed Oct 22
+              </span>
+<img alt="Alex Vance" class="w-6 h-6 rounded-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCBh6xqNctDedw-80QJu3e2msNY_cflGpeiLAGJ0nyhNmZXOsxexVRmm9I8GK8N4Ew0Xc79G_hM-N_lEV--ikPSmKPK5WnroEjKlqFuDd8Qhe_0jxznLwNNogjR7eY-gAeuUVCbXbREL8UXk4-vBBXiuQfx3KBm03mfPS2EQ46XzPXeB5Pt6dxpxe83ALuJYVZSrSYXNjWL7EIdjtmqgg6u6fdHf6WqPfdaBwF_dtCM4CWaXG4c7qMp"/>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- ==================== ALTERNATE LIST VIEW (TOGGLED) ==================== -->
+<div class="hidden flex-col gap-space-sm bg-surface-container-lowest rounded-xl shadow-sm overflow-hidden" id="view-list">
+<div class="overflow-x-auto">
+<table class="w-full text-left font-body-md text-body-md">
+<thead class="bg-surface-container-low text-on-surface-variant font-label-sm text-label-sm uppercase tracking-wider">
+<tr>
+<th class="py-3 px-4">Task Name</th>
+<th class="py-3 px-4">Workspace / Client</th>
+<th class="py-3 px-4">Status</th>
+<th class="py-3 px-4">Priority</th>
+<th class="py-3 px-4">Assignee</th>
+<th class="py-3 px-4">Due Date</th>
+<th class="py-3 px-4 text-right">Subtasks</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-surface-container-low">
+<tr class="hover:bg-surface-container-low/50 cursor-pointer transition-colors" onclick="openTaskDetail('Deliver Q4 UX Architecture Wireframes', 'Apex Digital', 'Urgent', 'Today, 5:00 PM', 'Alex Vance', '8/10', 'urgent')">
+<td class="py-3.5 px-4 font-headline-sm text-headline-sm text-on-surface">Deliver Q4 UX Architecture Wireframes</td>
+<td class="py-3.5 px-4"><span class="px-2 py-0.5 rounded bg-secondary-fixed text-on-secondary-fixed text-label-sm font-label-sm">Apex Digital</span></td>
+<td class="py-3.5 px-4"><span class="px-2 py-0.5 rounded bg-primary-fixed text-on-primary-fixed text-label-sm font-label-sm font-medium">In Progress</span></td>
+<td class="py-3.5 px-4"><span class="px-2 py-0.5 rounded bg-error-container text-on-error-container text-label-sm font-label-sm font-semibold">Urgent</span></td>
+<td class="py-3.5 px-4">Alex Vance</td>
+<td class="py-3.5 px-4 text-error font-medium">Today, 5:00 PM</td>
+<td class="py-3.5 px-4 text-right font-data-tabular text-data-tabular">8 / 10</td>
+</tr>
+<tr class="hover:bg-surface-container-low/50 cursor-pointer transition-colors" onclick="openTaskDetail('Prepare SOC2 Compliance Evidence for BlueWave', 'BlueWave Logistics', 'High', 'Tomorrow', 'Alex Vance', '2/5', 'active')">
+<td class="py-3.5 px-4 font-headline-sm text-headline-sm text-on-surface">Prepare SOC2 Compliance Evidence for BlueWave</td>
+<td class="py-3.5 px-4"><span class="px-2 py-0.5 rounded bg-primary/10 text-primary text-label-sm font-label-sm">BlueWave Logistics</span></td>
+<td class="py-3.5 px-4"><span class="px-2 py-0.5 rounded bg-surface-container text-on-surface-variant text-label-sm font-label-sm font-medium">To Do</span></td>
+<td class="py-3.5 px-4"><span class="px-2 py-0.5 rounded bg-tertiary-fixed text-on-tertiary-fixed text-label-sm font-label-sm font-semibold">High</span></td>
+<td class="py-3.5 px-4">Alex Vance</td>
+<td class="py-3.5 px-4 text-tertiary-container font-medium">Tomorrow</td>
+<td class="py-3.5 px-4 text-right font-data-tabular text-data-tabular">2 / 5</td>
+</tr>
+<tr class="hover:bg-surface-container-low/50 cursor-pointer transition-colors" onclick="openTaskDetail('Brand Guideline Approval &amp; Asset Sign-off', 'Hyperion Media', 'Urgent', '2 days overdue', 'Alex Vance', '1/3', 'blocked')">
+<td class="py-3.5 px-4 font-headline-sm text-headline-sm text-on-surface">Brand Guideline Approval &amp; Asset Sign-off</td>
+<td class="py-3.5 px-4"><span class="px-2 py-0.5 rounded bg-tertiary-fixed text-on-tertiary-fixed text-label-sm font-label-sm">Hyperion Media</span></td>
+<td class="py-3.5 px-4"><span class="px-2 py-0.5 rounded bg-error-container text-on-error-container text-label-sm font-label-sm font-medium">Blocked</span></td>
+<td class="py-3.5 px-4"><span class="px-2 py-0.5 rounded bg-error-container text-on-error-container text-label-sm font-label-sm font-semibold">Urgent</span></td>
+<td class="py-3.5 px-4">Alex Vance</td>
+<td class="py-3.5 px-4 text-error font-medium">2 days overdue</td>
+<td class="py-3.5 px-4 text-right font-data-tabular text-data-tabular">1 / 3</td>
+</tr>
+<tr class="hover:bg-surface-container-low/50 cursor-pointer transition-colors" onclick="openTaskDetail('Deploy Staging Environment Kubernetes Cluster', 'Lumina Health', 'High', 'Oct 28', 'Liam', '5/6', 'active')">
+<td class="py-3.5 px-4 font-headline-sm text-headline-sm text-on-surface">Deploy Staging Environment Kubernetes Cluster</td>
+<td class="py-3.5 px-4"><span class="px-2 py-0.5 rounded bg-primary-fixed text-on-primary-fixed text-label-sm font-label-sm">Lumina Health</span></td>
+<td class="py-3.5 px-4"><span class="px-2 py-0.5 rounded bg-primary-fixed text-on-primary-fixed text-label-sm font-label-sm font-medium">In Progress</span></td>
+<td class="py-3.5 px-4"><span class="px-2 py-0.5 rounded bg-tertiary-fixed text-on-tertiary-fixed text-label-sm font-label-sm font-semibold">High</span></td>
+<td class="py-3.5 px-4">Liam Scott</td>
+<td class="py-3.5 px-4 text-on-surface-variant">Oct 28</td>
+<td class="py-3.5 px-4 text-right font-data-tabular text-data-tabular">5 / 6</td>
+</tr>
+<tr class="hover:bg-surface-container-low/50 cursor-pointer transition-colors" onclick="openTaskDetail('Client Onboarding &amp; Slack Connect Room Setup', 'Apex Digital', 'Completed', 'Yesterday', 'Maya Chen', '4/4', 'done')">
+<td class="py-3.5 px-4 font-headline-sm text-headline-sm text-on-surface-variant line-through">Client Onboarding &amp; Slack Connect Room Setup</td>
+<td class="py-3.5 px-4"><span class="px-2 py-0.5 rounded bg-secondary-fixed text-on-secondary-fixed text-label-sm font-label-sm">Apex Digital</span></td>
+<td class="py-3.5 px-4"><span class="px-2 py-0.5 rounded bg-secondary-container text-on-secondary-container text-label-sm font-label-sm font-medium">Completed</span></td>
+<td class="py-3.5 px-4"><span class="px-2 py-0.5 rounded bg-surface-container text-on-surface-variant text-label-sm font-label-sm">Regular</span></td>
+<td class="py-3.5 px-4">Maya Chen</td>
+<td class="py-3.5 px-4 text-secondary">Oct 24</td>
+<td class="py-3.5 px-4 text-right font-data-tabular text-data-tabular">4 / 4</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<!-- Operational KPI Mini Strip -->
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-space-md pt-space-xs">
+<div class="p-4 bg-surface-container-lowest rounded-xl shadow-sm flex items-center justify-between">
+<div>
+<span class="font-label-sm text-label-sm text-outline uppercase">Sprint Completion</span>
+<div class="font-data-metric text-data-metric text-on-surface mt-0.5">68.2%</div>
+</div>
+<div class="p-2.5 bg-secondary-container/40 rounded-xl text-secondary">
+<span class="material-symbols-outlined text-[24px]">trending_up</span>
+</div>
+</div>
+<div class="p-4 bg-surface-container-lowest rounded-xl shadow-sm flex items-center justify-between">
+<div>
+<span class="font-label-sm text-label-sm text-outline uppercase">Avg Velocity</span>
+<div class="font-data-metric text-data-metric text-on-surface mt-0.5">14.4 <span class="font-body-sm text-body-sm text-on-surface-variant font-normal">pts/wk</span></div>
+</div>
+<div class="p-2.5 bg-primary-fixed/40 rounded-xl text-primary">
+<span class="material-symbols-outlined text-[24px]">speed</span>
+</div>
+</div>
+<div class="p-4 bg-surface-container-lowest rounded-xl shadow-sm flex items-center justify-between">
+<div>
+<span class="font-label-sm text-label-sm text-outline uppercase">Blocked Time</span>
+<div class="font-data-metric text-data-metric text-error mt-0.5">38 <span class="font-body-sm text-body-sm text-on-surface-variant font-normal">hrs</span></div>
+</div>
+<div class="p-2.5 bg-error-container/50 rounded-xl text-error">
+<span class="material-symbols-outlined text-[24px]">timer_off</span>
+</div>
+</div>
+<div class="p-4 bg-surface-container-lowest rounded-xl shadow-sm flex items-center justify-between">
+<div>
+<span class="font-label-sm text-label-sm text-outline uppercase">Next Milestone</span>
+<div class="font-headline-sm text-headline-sm text-on-surface mt-1 truncate">Apex Beta Release</div>
+</div>
+<div class="p-2.5 bg-tertiary-fixed/40 rounded-xl text-tertiary">
+<span class="material-symbols-outlined text-[24px]">flag</span>
+</div>
+</div>
+</div>
+</div>
+<!-- ==================== INTERACTIVE TASK DETAIL SLIDE-OVER DRAWER ==================== -->
+<div class="fixed inset-0 bg-inverse-surface/40 backdrop-blur-sm z-50 hidden transition-opacity opacity-0" id="drawer-backdrop"></div>
+<div class="fixed top-0 right-0 h-full w-full max-w-xl bg-surface-container-lowest shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col justify-between overflow-hidden" id="task-drawer">
+<!-- Drawer Header -->
+<div class="p-space-lg bg-surface-container-low/50 flex items-start justify-between gap-space-md">
+<div class="flex flex-col gap-1.5 flex-1 min-w-0">
+<div class="flex items-center gap-2 flex-wrap">
+<span class="font-label-sm text-label-sm px-2.5 py-0.5 rounded bg-secondary-fixed text-on-secondary-fixed font-medium" id="drawer-client-badge">Apex Digital</span>
+<span class="font-label-sm text-label-sm px-2 py-0.5 rounded bg-error-container text-on-error-container font-semibold" id="drawer-priority-badge">Urgent</span>
+<span class="font-label-sm text-label-sm text-outline">• ID #TASK-842</span>
+</div>
+<h2 class="font-headline-lg text-headline-lg text-on-surface leading-tight" id="drawer-title">Deliver Q4 UX Architecture Wireframes</h2>
+</div>
+<div class="flex items-center gap-1">
+<button class="p-1.5 rounded-lg text-outline hover:text-on-surface hover:bg-surface-container transition-colors" title="More options" type="button">
+<span class="material-symbols-outlined text-[20px]">more_vert</span>
+</button>
+<button class="p-1.5 rounded-lg text-outline hover:text-on-surface hover:bg-surface-container transition-colors" id="close-drawer" title="Close drawer" type="button">
+<span class="material-symbols-outlined text-[20px]">close</span>
+</button>
+</div>
+</div>
+<!-- Drawer Body (Scrollable) -->
+<div class="flex-1 overflow-y-auto p-space-lg flex flex-col gap-space-lg">
+<!-- Quick Metadata Grid -->
+<div class="grid grid-cols-2 gap-space-md p-space-md rounded-xl bg-surface-container-low/40">
+<div class="flex flex-col gap-1">
+<span class="font-label-sm text-label-sm text-outline uppercase tracking-wider">Assignee</span>
+<div class="flex items-center gap-2">
+<img alt="Alex Vance" class="w-6 h-6 rounded-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCBh6xqNctDedw-80QJu3e2msNY_cflGpeiLAGJ0nyhNmZXOsxexVRmm9I8GK8N4Ew0Xc79G_hM-N_lEV--ikPSmKPK5WnroEjKlqFuDd8Qhe_0jxznLwNNogjR7eY-gAeuUVCbXbREL8UXk4-vBBXiuQfx3KBm03mfPS2EQ46XzPXeB5Pt6dxpxe83ALuJYVZSrSYXNjWL7EIdjtmqgg6u6fdHf6WqPfdaBwF_dtCM4CWaXG4c7qMp"/>
+<span class="font-label-md text-label-md text-on-surface" id="drawer-assignee">Alex Vance</span>
+</div>
+</div>
+<div class="flex flex-col gap-1">
+<span class="font-label-sm text-label-sm text-outline uppercase tracking-wider">Due Date</span>
+<div class="flex items-center gap-1.5 text-error font-medium font-body-md text-body-md">
+<span class="material-symbols-outlined text-[16px]">alarm</span>
+<span id="drawer-due">Today, 5:00 PM</span>
+</div>
+</div>
+<div class="flex flex-col gap-1">
+<span class="font-label-sm text-label-sm text-outline uppercase tracking-wider">Status Column</span>
+<span class="font-label-md text-label-md text-primary font-medium flex items-center gap-1">
+<span class="w-2 h-2 rounded-full bg-primary"></span> In Progress
+          </span>
+</div>
+<div class="flex flex-col gap-1">
+<span class="font-label-sm text-label-sm text-outline uppercase tracking-wider">Estimate</span>
+<span class="font-body-md text-body-md text-on-surface">16 Hours (14 Tracked)</span>
+</div>
+</div>
+<!-- Description Block -->
+<div class="flex flex-col gap-2">
+<span class="font-headline-sm text-headline-sm text-on-surface">Description</span>
+<div class="font-body-md text-body-md text-on-surface-variant leading-relaxed bg-surface-container-low/20 p-space-md rounded-xl">
+          Comprehensive interaction schematics and information architecture diagrams for Apex Digital’s multi-tenant billing flow. Must validate cross-device responsiveness with their product design board before handover to frontend engineering sprint.
+        </div>
+</div>
+<!-- Subtasks Checklist Section -->
+<div class="flex flex-col gap-space-sm">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="font-headline-sm text-headline-sm text-on-surface">Subtasks Checklist</span>
+<span class="font-label-sm text-label-sm px-2 py-0.5 rounded-full bg-surface-container text-on-surface-variant" id="drawer-checklist-stat">8/10</span>
+</div>
+<button class="font-label-sm text-label-sm text-primary hover:underline flex items-center gap-1" type="button">
+<span class="material-symbols-outlined text-[14px]">add</span> Add item
+          </button>
+</div>
+<div class="flex flex-col gap-2">
+<label class="flex items-center gap-space-sm p-2 rounded-lg hover:bg-surface-container-low cursor-pointer transition-colors">
+<input checked="" class="w-4 h-4 rounded text-primary-container focus:ring-0" type="checkbox"/>
+<span class="font-body-md text-body-md text-on-surface line-through text-opacity-70">Audit previous quarterly user feedback notes</span>
+</label>
+<label class="flex items-center gap-space-sm p-2 rounded-lg hover:bg-surface-container-low cursor-pointer transition-colors">
+<input checked="" class="w-4 h-4 rounded text-primary-container focus:ring-0" type="checkbox"/>
+<span class="font-body-md text-body-md text-on-surface line-through text-opacity-70">Map checkout navigation node tree</span>
+</label>
+<label class="flex items-center gap-space-sm p-2 rounded-lg hover:bg-surface-container-low cursor-pointer transition-colors">
+<input checked="" class="w-4 h-4 rounded text-primary-container focus:ring-0" type="checkbox"/>
+<span class="font-body-md text-body-md text-on-surface line-through text-opacity-70">Design multi-tier subscription selectors in Figma</span>
+</label>
+<label class="flex items-center gap-space-sm p-2 rounded-lg hover:bg-surface-container-low cursor-pointer transition-colors">
+<input class="w-4 h-4 rounded text-primary-container focus:ring-0" type="checkbox"/>
+<span class="font-body-md text-body-md text-on-surface">Incorporate Stripe Elements 3D Secure verification fallback</span>
+</label>
+<label class="flex items-center gap-space-sm p-2 rounded-lg hover:bg-surface-container-low cursor-pointer transition-colors">
+<input class="w-4 h-4 rounded text-primary-container focus:ring-0" type="checkbox"/>
+<span class="font-body-md text-body-md text-on-surface">Review high-fidelity prototypes with Maya Chen</span>
+</label>
+</div>
+</div>
+<!-- Activity History & Comments Timeline -->
+<div class="flex flex-col gap-space-sm">
+<span class="font-headline-sm text-headline-sm text-on-surface">Activity &amp; Comments</span>
+<div class="relative pl-6 space-y-4 before:content-[''] before:absolute before:left-2.5 before:top-2 before:bottom-2 before:w-0.5 before:bg-surface-container">
+<!-- Timeline Item 1 -->
+<div class="relative flex items-start gap-3">
+<div class="absolute -left-6 top-1 w-3 h-3 rounded-full bg-primary ring-4 ring-surface-container-lowest"></div>
+<div class="flex flex-col gap-1 bg-surface-container-low/40 p-3 rounded-lg w-full">
+<div class="flex items-center justify-between">
+<span class="font-label-md text-label-md text-on-surface">Alex Vance</span>
+<span class="font-label-sm text-label-sm text-outline">2 hours ago</span>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant">Completed wireframes for mobile breakpoint. Exported specs for review.</p>
+</div>
+</div>
+<!-- Timeline Item 2 -->
+<div class="relative flex items-start gap-3">
+<div class="absolute -left-6 top-1 w-3 h-3 rounded-full bg-secondary ring-4 ring-surface-container-lowest"></div>
+<div class="flex flex-col gap-1 bg-surface-container-low/40 p-3 rounded-lg w-full">
+<div class="flex items-center justify-between">
+<span class="font-label-md text-label-md text-on-surface">Maya Chen</span>
+<span class="font-label-sm text-label-sm text-outline">Yesterday at 4:15 PM</span>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant">Client flagged that enterprise tiered plans need custom seat allocation inputs.</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Drawer Footer Input -->
+<div class="p-space-md bg-surface-container-lowest shadow-lg flex flex-col gap-space-xs">
+<div class="relative flex items-center">
+<input class="w-full h-10 pl-3.5 pr-24 bg-surface-container-low text-on-surface rounded-lg font-body-sm text-body-sm focus:outline-none focus:bg-surface-container-lowest focus:ring-2 focus:ring-primary-container transition-all" placeholder="Add a comment or operational update..." type="text"/>
+<button class="absolute right-1.5 h-7 px-3 bg-primary-container text-on-primary rounded font-label-sm text-label-sm flex items-center gap-1 hover:bg-primary transition-colors" type="button">
+<span>Post</span>
+<span class="material-symbols-outlined text-[14px]">send</span>
+</button>
+</div>
+<div class="flex items-center justify-between text-xs text-outline px-1">
+<span>Press <kbd class="px-1 rounded bg-surface-container font-mono">⌘Enter</kbd> to submit</span>
+<div class="flex items-center gap-2">
+<button class="hover:text-on-surface transition-colors" type="button"><span class="material-symbols-outlined text-[16px]">attach_file</span></button>
+<button class="hover:text-on-surface transition-colors" type="button"><span class="material-symbols-outlined text-[16px]">alternate_email</span></button>
+</div>
+</div>
+</div>
+</div>
+</div>
+<script>
+  // View Toggle Interactions
+  const kanbanBtn = document.getElementById('view-btn-kanban');
+  const listBtn = document.getElementById('view-btn-list');
+  const kanbanView = document.getElementById('view-kanban');
+  const listView = document.getElementById('view-list');
+
+  kanbanBtn.addEventListener('click', () => {
+    kanbanBtn.classList.add('bg-surface-container-lowest', 'text-primary-container', 'shadow-sm');
+    kanbanBtn.classList.remove('text-on-surface-variant');
+    listBtn.classList.remove('bg-surface-container-lowest', 'text-primary-container', 'shadow-sm');
+    listBtn.classList.add('text-on-surface-variant');
+    kanbanView.classList.remove('hidden');
+    listView.classList.add('hidden');
+  });
+
+  listBtn.addEventListener('click', () => {
+    listBtn.classList.add('bg-surface-container-lowest', 'text-primary-container', 'shadow-sm');
+    listBtn.classList.remove('text-on-surface-variant');
+    kanbanBtn.classList.remove('bg-surface-container-lowest', 'text-primary-container', 'shadow-sm');
+    kanbanBtn.classList.add('text-on-surface-variant');
+    listView.classList.remove('hidden');
+    kanbanView.classList.add('hidden');
+  });
+
+  // Drawer Interactions
+  const drawer = document.getElementById('task-drawer');
+  const backdrop = document.getElementById('drawer-backdrop');
+  const closeDrawerBtn = document.getElementById('close-drawer');
+  const createBtn = document.getElementById('open-create-task');
+
+  function openTaskDetail(title, client, priority, due, assignee, checklist, state) {
+    document.getElementById('drawer-title').textContent = title;
+    document.getElementById('drawer-client-badge').textContent = client;
+    document.getElementById('drawer-priority-badge').textContent = priority;
+    document.getElementById('drawer-due').textContent = due;
+    document.getElementById('drawer-assignee').textContent = assignee;
+    document.getElementById('drawer-checklist-stat').textContent = checklist;
+
+    backdrop.classList.remove('hidden');
+    setTimeout(() => backdrop.classList.remove('opacity-0'), 10);
+    drawer.classList.remove('translate-x-full');
+  }
+
+  function closeDrawer() {
+    backdrop.classList.add('opacity-0');
+    drawer.classList.add('translate-x-full');
+    setTimeout(() => backdrop.classList.add('hidden'), 300);
+  }
+
+  backdrop.addEventListener('click', closeDrawer);
+  closeDrawerBtn.addEventListener('click', closeDrawer);
+
+  createBtn.addEventListener('click', () => {
+    openTaskDetail('Create New Strategic Initiative', 'Northstar Studio', 'High', 'Select Date', 'Alex Vance', '0/1', 'active');
+  });
+</script></main></div></body></html>
