@@ -10,6 +10,7 @@ import { ASSIGNABLE_CUSTOMER_STATUSES, CUSTOMER_TIERS } from "../../modules/cust
 import { EMAIL_ENTITY_TYPES, EMAIL_KINDS, EMAIL_STATUSES } from "../../modules/mail/domain/email";
 import { NOTIFICATION_TYPES } from "../../modules/notifications/domain/notification";
 import { ORDER_CATEGORIES, ORDER_STATUSES, PAYMENT_TERMS } from "../../modules/sales/domain/order";
+import { PAYMENT_METHODS } from "../../modules/sales/domain/payment";
 import { TASK_PRIORITIES, TASK_STATUSES } from "../../modules/tasks/domain/task";
 import { WORKSPACE_ROLES } from "../../modules/workspaces/domain/workspace";
 
@@ -221,6 +222,27 @@ export const orderItems = sqliteTable(
   (t) => [index("order_items_order_idx").on(t.orderId)],
 );
 
+/** Money received against an order (partial payments allowed). Balance = order total - sum(payments). */
+export const payments = sqliteTable(
+  "payments",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    workspaceId: workspaceId(),
+    orderId: integer("order_id")
+      .notNull()
+      .references(() => orders.id, { onDelete: "cascade" }),
+    amountCents: integer("amount_cents").notNull(),
+    method: text("method", { enum: PAYMENT_METHODS }).notNull(),
+    paidAt: integer("paid_at", { mode: "timestamp_ms" }).notNull(),
+    /** External reference (wire id, card receipt, cheque number). */
+    reference: text("reference"),
+    note: text("note"),
+    recordedById: integer("recorded_by_id").references(() => members.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+  },
+  (t) => [index("payments_order_idx").on(t.orderId), index("payments_workspace_paid_idx").on(t.workspaceId, t.paidAt)],
+);
+
 export const tasks = sqliteTable(
   "tasks",
   {
@@ -331,6 +353,12 @@ export const customersRelations = relations(customers, ({ many }) => ({
 export const ordersRelations = relations(orders, ({ one, many }) => ({
   customer: one(customers, { fields: [orders.customerId], references: [customers.id] }),
   items: many(orderItems),
+  payments: many(payments),
+}));
+
+export const paymentsRelations = relations(payments, ({ one }) => ({
+  order: one(orders, { fields: [payments.orderId], references: [orders.id] }),
+  recordedBy: one(members, { fields: [payments.recordedById], references: [members.id] }),
 }));
 
 export const orderItemsRelations = relations(orderItems, ({ one }) => ({

@@ -1,15 +1,16 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState, useMemo, useState } from "react";
 import { cn } from "@/shared/lib/cn";
 import { dollarsToCents, formatMoney } from "@/shared/domain/money";
 import { formatDate } from "@/shared/domain/time";
 import { Badge } from "@/shared/ui/badge";
-import { Button } from "@/shared/ui/button";
+import { Button, buttonClasses } from "@/shared/ui/button";
 import { Card } from "@/shared/ui/card";
 import { Icon } from "@/shared/ui/icon";
 import { computeOrderTotals, dueDateFor, type OrderCategory, type PaymentTerms } from "../../domain/order";
-import { createOrderAction } from "../actions";
+import { createOrderAction, updateOrderAction } from "../actions";
 import { EARLY_SETTLEMENT_BPS, INITIAL_SALE_FORM_STATE, MAX_LINE_ITEMS } from "../form-schema";
 
 export interface SaleItemDraft {
@@ -31,6 +32,21 @@ export interface SaleFormProps {
   lastOrderItems: ReadonlyArray<SaleItemDraft> | null;
   /** Highlight + focus the form (arrived from the topbar "Create New" shortcut). */
   highlighted?: boolean;
+  /** Reopens an existing draft / pending order in the composer (`?edit=SL-xxxx`). */
+  editing?: SaleFormEditing | null;
+}
+
+export interface SaleFormEditing {
+  reference: string;
+  statusLabel: string;
+  customerId: number;
+  category: OrderCategory;
+  paymentTerms: PaymentTerms;
+  earlySettlement: boolean;
+  items: ReadonlyArray<SaleItemDraft>;
+  /** Issue date (ISO); the due date is recomputed from it. */
+  issueDateIso: string;
+  cancelHref: string;
 }
 
 type ItemRow = SaleItemDraft & { key: number };
@@ -73,18 +89,19 @@ function Step({ n, text, state }: { n: number; text: string; state: "done" | "cu
 
 /** "Create New Sale" work-order composer: terms, deliverable breakdown, live totals, draft or confirm. */
 export function SaleForm(props: SaleFormProps) {
-  const { customers, categoryOptions, termsOptions } = props;
-  const [state, formAction, pending] = useActionState(createOrderAction, INITIAL_SALE_FORM_STATE);
-  const [customerId, setCustomerId] = useState("");
-  const [terms, setTerms] = useState<PaymentTerms>(termsOptions[0]?.value ?? "net_30");
-  const [category, setCategory] = useState<OrderCategory>(categoryOptions[0]?.value ?? "custom_software");
-  const [earlySettlement, setEarlySettlement] = useState(true);
-  const [items, setItems] = useState<ItemRow[]>(() => withKeys(props.retainerTemplate));
+  const { customers, categoryOptions, termsOptions, editing } = props;
+  const [state, formAction, pending] = useActionState(editing ? updateOrderAction : createOrderAction, INITIAL_SALE_FORM_STATE);
+  const [customerId, setCustomerId] = useState(editing ? String(editing.customerId) : "");
+  const [terms, setTerms] = useState<PaymentTerms>(editing?.paymentTerms ?? termsOptions[0]?.value ?? "net_30");
+  const [category, setCategory] = useState<OrderCategory>(editing?.category ?? categoryOptions[0]?.value ?? "custom_software");
+  const [earlySettlement, setEarlySettlement] = useState(editing?.earlySettlement ?? true);
+  const [items, setItems] = useState<ItemRow[]>(() => withKeys(editing?.items ?? props.retainerTemplate));
 
   const customer = customers.find((c) => String(c.id) === customerId);
   const priced = items.map((i) => ({ quantity: safeQuantity(i.quantity), unitRateCents: safeCents(i.unitRate) }));
   const totals = computeOrderTotals(priced, { discountBps: earlySettlement ? EARLY_SETTLEMENT_BPS : 0 });
-  const dueDate = useMemo(() => dueDateFor(new Date(props.todayIso), terms), [props.todayIso, terms]);
+  const issueIso = editing?.issueDateIso ?? props.todayIso;
+  const dueDate = useMemo(() => dueDateFor(new Date(issueIso), terms), [issueIso, terms]);
   const validItems = items.length > 0 && items.every((i, idx) => i.title.trim() && priced[idx]!.quantity > 0 && priced[idx]!.unitRateCents > 0);
   const itemsPayload = JSON.stringify(items.map(({ title, description, quantity, unit, unitRate }) => ({ title, description, quantity, unit, unitRate })));
 
@@ -107,11 +124,13 @@ export function SaleForm(props: SaleFormProps) {
         <div>
           <div className="flex items-center gap-space-sm">
             <h2 id="create-sale-title" className="text-headline-md text-ink">
-              Create New Sale
+              {editing ? `Edit Order #${editing.reference}` : "Create New Sale"}
             </h2>
-            <Badge tone="info">Work Order</Badge>
+            <Badge tone={editing ? "warning" : "info"}>{editing ? editing.statusLabel : "Work Order"}</Badge>
           </div>
-          <p className="mt-1 max-w-sm text-body-sm text-ink-subtle">Author commercial commitments and produce dispatch-ready invoices.</p>
+          <p className="mt-1 max-w-sm text-body-sm text-ink-subtle">
+            {editing ? "Update the client, terms and deliverables; totals and the due date are recalculated." : "Author commercial commitments and produce dispatch-ready invoices."}
+          </p>
         </div>
         <ol aria-label="Progress" className="flex items-center gap-space-sm rounded-control bg-surface-container-low px-space-sm py-1.5">
           <Step n={1} text="Terms" state={customer ? "done" : "current"} />
@@ -129,6 +148,7 @@ export function SaleForm(props: SaleFormProps) {
           </p>
         ) : null}
         <input type="hidden" name="items" value={itemsPayload} />
+        {editing ? <input type="hidden" name="reference" value={editing.reference} /> : null}
         {earlySettlement ? <input type="hidden" name="earlySettlement" value="on" /> : null}
 
         <fieldset className="grid grid-cols-1 gap-space-md rounded-card bg-surface-container-low p-space-md sm:grid-cols-[1.6fr_1fr]">
@@ -174,8 +194,8 @@ export function SaleForm(props: SaleFormProps) {
               <input
                 id="reference"
                 readOnly
-                value={`#${props.nextReference}`}
-                title="Assigned automatically when the order is saved"
+                value={`#${editing?.reference ?? props.nextReference}`}
+                title={editing ? "Order references never change" : "Assigned automatically when the order is saved"}
                 className="tabular w-full min-w-0 bg-transparent text-body-md text-ink focus:outline-none"
               />
               <Icon name="lock" size={16} className="text-ink-subtle" />
@@ -377,19 +397,30 @@ export function SaleForm(props: SaleFormProps) {
           </div>
         </section>
 
-        <div className="flex flex-wrap items-center justify-between gap-space-sm">
-          <div className="flex items-center gap-space-sm">
-            <Button variant="ghost" size="lg" className="bg-surface-container-low" onClick={reset} disabled={pending}>
+        {editing ? (
+          <div className="flex flex-wrap items-center justify-between gap-space-sm">
+            <Link href={editing.cancelHref} scroll={false} className={buttonClasses({ variant: "ghost", size: "lg", className: "bg-surface-container-low" })}>
               Cancel
-            </Button>
-            <Button type="submit" name="intent" value="draft" variant="ghost" size="lg" icon="bookmark" className="bg-surface-container-low" disabled={pending}>
-              Save Draft
+            </Link>
+            <Button type="submit" size="lg" icon="save" disabled={pending || !customer || !validItems}>
+              {pending ? "Saving..." : "Save Changes"}
             </Button>
           </div>
-          <Button type="submit" name="intent" value="confirm" size="lg" trailingIcon="arrow_forward" disabled={pending || !customer || !validItems}>
-            {pending ? "Saving..." : "Confirm & Create Invoice"}
-          </Button>
-        </div>
+        ) : (
+          <div className="flex flex-wrap items-center justify-between gap-space-sm">
+            <div className="flex items-center gap-space-sm">
+              <Button variant="ghost" size="lg" className="bg-surface-container-low" onClick={reset} disabled={pending}>
+                Cancel
+              </Button>
+              <Button type="submit" name="intent" value="draft" variant="ghost" size="lg" icon="bookmark" className="bg-surface-container-low" disabled={pending}>
+                Save Draft
+              </Button>
+            </div>
+            <Button type="submit" name="intent" value="confirm" size="lg" trailingIcon="arrow_forward" disabled={pending || !customer || !validItems}>
+              {pending ? "Saving..." : "Confirm & Create Invoice"}
+            </Button>
+          </div>
+        )}
       </form>
     </Card>
   );

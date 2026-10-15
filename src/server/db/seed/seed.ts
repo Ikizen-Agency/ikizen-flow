@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { PAYMENT_METHODS } from "../../../modules/sales/domain/payment";
 import { hashPassword } from "better-auth/crypto";
 import { and, asc, desc, eq } from "drizzle-orm";
 import type { ActivityCategory } from "../../../modules/activity/domain/activity";
@@ -22,6 +23,7 @@ import {
   verification,
   workspaceMemberships,
   workspaces,
+  payments,
 } from "../schema";
 import {
   ACTIVITY,
@@ -206,8 +208,11 @@ async function insertOrders(
   customerId: Lookup,
   planned: ReadonlyArray<PlannedOrder>,
   firstReference: number,
+  /** Member recorded as having taken the seeded payments. */
+  recordedById: number | null,
 ) {
   let invoiceSequence = 1900;
+  let openIndex = 0;
   for (const [index, o] of planned.entries()) {
     const terms = o.paymentTerms ?? "net_30";
     const dueDate = dueDateFor(o.issueDate, terms);
@@ -238,6 +243,26 @@ async function insertOrders(
         updatedAt: paidAt ?? o.issueDate,
       })
       .returning({ id: orders.id });
+
+    // Payments: completed orders are fully paid on their paidAt; every third invoiced/processing order has a 40% deposit.
+    const method = PAYMENT_METHODS[index % PAYMENT_METHODS.length]!;
+    if (paidAt) {
+      await db.insert(payments).values({ workspaceId, orderId: order!.id, amountCents: o.amountCents, method, paidAt, reference: invoiceNumber, recordedById, createdAt: paidAt });
+    } else if (o.status === "invoiced" || o.status === "processing") {
+      if (openIndex++ % 3 === 0) {
+        const depositAt = new Date(Math.min(o.issueDate.getTime() + 7 * DAY, now.getTime()));
+        await db.insert(payments).values({
+          workspaceId,
+          orderId: order!.id,
+          amountCents: Math.round(o.amountCents * 0.4),
+          method,
+          paidAt: depositAt,
+          note: "40% deposit",
+          recordedById,
+          createdAt: depositAt,
+        });
+      }
+    }
 
     const items = o.items ?? [{ title: o.title, description: o.description, quantity: 1, unitRateCents: o.amountCents }];
     await db.insert(orderItems).values(
@@ -369,7 +394,7 @@ async function insertInbox(db: Database, now: Date, workspaceId: number, recipie
 
 /** Wipes every table and inserts the demo login plus two workspaces, with dates relative to `now`. */
 export async function seedDatabase(db: Database, now: Date): Promise<SeedSummary> {
-  for (const table of [notifications, emailOutbox, activityEvents, taskSubtasks, tasks, orderItems, orders, customers, workspaceMemberships, members, workspaces]) {
+  for (const table of [notifications, emailOutbox, activityEvents, taskSubtasks, tasks, payments, orderItems, orders, customers, workspaceMemberships, members, workspaces]) {
     await db.delete(table);
   }
   for (const table of [session, account, verification, user]) await db.delete(table);
@@ -396,14 +421,14 @@ export async function seedDatabase(db: Database, now: Date): Promise<SeedSummary
     (a, b) => a.issueDate.getTime() - b.issueDate.getTime(),
   );
   // References end at SL-1048 (the latest order in the design's sales register).
-  await insertOrders(db, now, north.workspaceId, northCustomers, planned, 1048 - planned.length + 1);
+  await insertOrders(db, now, north.workspaceId, northCustomers, planned, 1048 - planned.length + 1, lookup(north.memberId, DEMO_USER.name, "member"));
   await insertTasks(db, now, north.workspaceId, northCustomers, north.memberId, TASKS);
   await insertActivity(db, now, north.workspaceId, north.memberId, ACTIVITY);
 
   // Helix Labs Sandbox: a small second workspace (its references and invoice numbers overlap Northstar's on purpose).
   const sandbox = await insertWorkspace(db, now, SANDBOX_WORKSPACE, SANDBOX_WORKSPACE.members, owner);
   const sandboxCustomers = await insertCustomers(db, now, sandbox.workspaceId, SANDBOX_WORKSPACE.customers);
-  await insertOrders(db, now, sandbox.workspaceId, sandboxCustomers, SANDBOX_WORKSPACE.orders.map(atDaysAgo), 1001);
+  await insertOrders(db, now, sandbox.workspaceId, sandboxCustomers, SANDBOX_WORKSPACE.orders.map(atDaysAgo), 1001, lookup(sandbox.memberId, DEMO_USER.name, "member"));
   await insertTasks(db, now, sandbox.workspaceId, sandboxCustomers, sandbox.memberId, SANDBOX_WORKSPACE.tasks);
   await insertActivity(db, now, sandbox.workspaceId, sandbox.memberId, SANDBOX_WORKSPACE.activity);
 

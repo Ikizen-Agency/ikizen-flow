@@ -148,3 +148,44 @@ export function nextOrderReference(latest: string | null): string {
   const n = latest ? Number(latest.replace(REFERENCE_PREFIX, "")) : 1000;
   return `${REFERENCE_PREFIX}${(Number.isFinite(n) ? n : 1000) + 1}`;
 }
+
+/** Orders not yet in delivery can be reopened in the sale composer. */
+export const EDITABLE_ORDER_STATUSES: ReadonlyArray<OrderStatus> = ["draft", "pending"];
+/** Only orders that never produced revenue can be deleted. */
+export const DELETABLE_ORDER_STATUSES: ReadonlyArray<OrderStatus> = ["draft", "cancelled"];
+
+export class OrderNotEditableError extends Error {
+  constructor(
+    readonly reference: string,
+    readonly status: OrderStatus,
+  ) {
+    super(`Order ${reference} is ${ORDER_STATUS_LABELS[status].toLowerCase()} and can no longer be edited. Only drafts and pending orders can be edited.`);
+    this.name = "OrderNotEditableError";
+  }
+}
+
+export class OrderNotDeletableError extends Error {
+  constructor(
+    readonly reference: string,
+    readonly status: OrderStatus,
+  ) {
+    super(`Order ${reference} is ${ORDER_STATUS_LABELS[status].toLowerCase()} and cannot be deleted. Only drafts and cancelled orders can be deleted.`);
+    this.name = "OrderNotDeletableError";
+  }
+}
+
+export function canEditOrder(status: OrderStatus): boolean {
+  return EDITABLE_ORDER_STATUSES.includes(status);
+}
+
+export function assertOrderEditable(reference: string, status: OrderStatus): void {
+  if (!canEditOrder(status)) throw new OrderNotEditableError(reference, status);
+}
+
+export function canDeleteOrder(status: OrderStatus): boolean {
+  return DELETABLE_ORDER_STATUSES.includes(status);
+}
+
+export function assertOrderDeletable(reference: string, status: OrderStatus): void {
+  if (!canDeleteOrder(status)) throw new OrderNotDeletableError(reference, status);
+}

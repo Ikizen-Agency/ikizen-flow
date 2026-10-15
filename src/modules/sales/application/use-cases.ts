@@ -4,6 +4,8 @@ import type { Notify } from "../../notifications/application/use-cases";
 import { NotFoundError, type Clock } from "../../shared-types";
 import { computeSalesKpis, countByEffectiveStatus, onTimeDeliveryRate, weeklyBilledTotals } from "../domain/metrics";
 import {
+  assertOrderDeletable,
+  assertOrderEditable,
   assertOrderTransition,
   computeOrderTotals,
   dueDateFor,
@@ -13,10 +15,13 @@ import {
   type OrderStatus,
   type PaymentTerms,
 } from "../domain/order";
-import type { NewOrderItem, OrderListQuery, OrderRepository } from "./ports";
+import { assertPaymentAllowed, orderBalance, statusAfterPayment, statusAfterPaymentRemoval, type PaymentMethod } from "../domain/payment";
+import { formatMoney } from "@/shared/domain/money";
+import type { NewOrderItem, OrderListQuery, OrderRepository, PaymentRepository } from "./ports";
 
 export interface SalesDeps {
   orders: OrderRepository;
+  payments: PaymentRepository;
   customers: CustomerRepository;
   activity: ActivityRepository;
   clock: Clock;
@@ -44,7 +49,7 @@ export interface CreateOrderInput {
 }
 
 export const makeCreateOrder =
-  ({ orders, customers, activity, clock }: SalesDeps) =>
+  ({ orders, customers, activity, clock }: Omit<SalesDeps, "payments">) =>
   async (input: CreateOrderInput, actorId: number | null = null) => {
     const now = clock();
     const customer = await customers.findById(input.customerId);
@@ -84,12 +89,17 @@ export const makeCreateOrder =
   };
 
 export const makeChangeOrderStatus =
-  ({ orders, activity, clock, notify }: Omit<SalesDeps, "customers">) =>
+  ({ orders, payments, activity, clock, notify }: Omit<SalesDeps, "customers">) =>
   async (reference: string, status: OrderStatus, actorId: number | null = null) => {
     const now = clock();
     const order = await orders.findByReference(reference);
     if (!order) throw new NotFoundError("Order", reference);
     assertOrderTransition(order.status, status);
+    // "Mark as Paid" settles whatever is still due, so payments always add up to a completed order's total.
+    const balance = orderBalance(order);
+    if (status === "completed" && balance > 0) {
+      await payments.create({ orderId: order.id, amountCents: balance, method: "other", paidAt: now, note: "Marked as paid", recordedById: actorId }, now);
+    }
 
     const invoiceNumber =
       status === "invoiced" && !order.invoiceNumber ? `INV-${order.reference.replace("SL-", "")}` : order.invoiceNumber;
@@ -147,3 +157,145 @@ export const makeGetSalesOverview =
       nextReference: nextOrderReference(latestReference),
     };
   };
+
+export interface UpdateOrderInput {
+  customerId: number;
+  category: OrderCategory;
+  paymentTerms: PaymentTerms;
+  discountBps?: number;
+  taxBps?: number;
+  description?: string | null;
+  items: NewOrderItem[];
+}
+
+/** Reopens a draft or pending order in the composer: recomputes totals and the due date from its issue date. */
+export const makeUpdateOrder =
+  ({ orders, customers, activity, clock }: Omit<SalesDeps, "payments">) =>
+  async (reference: string, input: UpdateOrderInput, actorId: number | null = null) => {
+    const order = await orders.findByReference(reference);
+    if (!order) throw new NotFoundError("Order", reference);
+    assertOrderEditable(order.reference, order.status);
+    const customer = await customers.findById(input.customerId);
+    if (!customer) throw new NotFoundError("Customer", input.customerId);
+    const now = clock();
+    const totals = computeOrderTotals(input.items, { discountBps: input.discountBps, taxBps: input.taxBps });
+    await orders.update(order.id, {
+      customerId: customer.id,
+      title: input.items[0]?.title ?? order.title,
+      description: input.description === undefined ? order.description : input.description,
+      category: input.category,
+      paymentTerms: input.paymentTerms,
+      subtotalCents: totals.subtotalCents,
+      discountCents: totals.discountCents,
+      taxCents: totals.taxCents,
+      amountCents: totals.totalCents,
+      dueDate: dueDateFor(order.issueDate, input.paymentTerms),
+      items: input.items,
+      updatedAt: now,
+    });
+    await customers.touch(customer.id, now);
+    await activity.record({
+      actorId,
+      message: `updated order #${order.reference} for ${customer.company}`,
+      category: "billing",
+      entityType: "order",
+      entityId: order.id,
+      createdAt: now,
+    });
+    return { reference: order.reference };
+  };
+
+/** Deletes a draft or cancelled order (items and payments cascade). */
+export const makeDeleteOrder =
+  ({ orders, activity, clock }: Pick<SalesDeps, "orders" | "activity" | "clock">) =>
+  async (reference: string, actorId: number | null = null) => {
+    const order = await orders.findByReference(reference);
+    if (!order) throw new NotFoundError("Order", reference);
+    assertOrderDeletable(order.reference, order.status);
+    await orders.delete(order.id);
+    await activity.record({
+      actorId,
+      message: `deleted ${ORDER_STATUS_LABELS[order.status].toLowerCase()} order #${order.reference} for ${order.customerCompany}`,
+      category: "billing",
+      entityType: "order",
+      entityId: order.id,
+      createdAt: clock(),
+    });
+  };
+
+export interface RecordPaymentInput {
+  amountCents: number;
+  method: PaymentMethod;
+  /** When the money arrived (defaults to now). */
+  paidAt?: Date;
+  reference?: string | null;
+  note?: string | null;
+}
+
+/** Records a (partial) payment; a fully paid order moves to completed with `paidAt` of the settling payment. */
+export const makeRecordPayment =
+  ({ orders, payments, activity, clock, notify }: Omit<SalesDeps, "customers">) =>
+  async (reference: string, input: RecordPaymentInput, actorId: number | null = null) => {
+    const order = await orders.findByReference(reference);
+    if (!order) throw new NotFoundError("Order", reference);
+    assertPaymentAllowed(order, input.amountCents);
+    const now = clock();
+    const paidAt = input.paidAt ?? now;
+    const payment = await payments.create(
+      { orderId: order.id, amountCents: input.amountCents, method: input.method, paidAt, reference: input.reference ?? null, note: input.note ?? null, recordedById: actorId },
+      now,
+    );
+    const paidCents = order.paidCents + input.amountCents;
+    const next = statusAfterPayment(order.status, order.amountCents, paidCents);
+    if (next) {
+      assertOrderTransition(order.status, next);
+      await orders.updateStatus(order.id, { status: next, invoiceNumber: order.invoiceNumber, paidAt, updatedAt: now });
+    }
+    await activity.record({
+      actorId,
+      message: `recorded a ${formatMoney(input.amountCents)} payment on order #${order.reference}${next ? " (paid in full)" : ""}`,
+      category: "billing",
+      entityType: "order",
+      entityId: order.id,
+      createdAt: now,
+    });
+    if (notify) {
+      await notify({
+        recipientIds: [await activity.originatorOf("order", order.id)],
+        actorId,
+        type: "payment_received",
+        title: `Payment of ${formatMoney(input.amountCents)} received for ${order.reference}`,
+        body: next ? `${order.customerCompany} · paid in full` : `${order.customerCompany} · ${formatMoney(order.amountCents - paidCents)} still due`,
+        href: `/sales?order=${encodeURIComponent(order.reference)}`,
+      });
+    }
+    return { payment, completed: next === "completed" };
+  };
+
+/** Removes a payment; a completed order that is no longer fully paid goes back to invoiced. */
+export const makeDeletePayment =
+  ({ orders, payments, activity, clock }: Pick<SalesDeps, "orders" | "payments" | "activity" | "clock">) =>
+  async (paymentId: number, actorId: number | null = null) => {
+    const payment = await payments.findById(paymentId);
+    if (!payment) throw new NotFoundError("Payment", paymentId);
+    const order = await orders.findById(payment.orderId);
+    if (!order) throw new NotFoundError("Order", payment.orderId);
+    await payments.delete(payment.id);
+    const now = clock();
+    const next = statusAfterPaymentRemoval(order.status, order.amountCents, order.paidCents - payment.amountCents);
+    if (next) await orders.updateStatus(order.id, { status: next, invoiceNumber: order.invoiceNumber, paidAt: null, updatedAt: now });
+    await activity.record({
+      actorId,
+      message: `removed a ${formatMoney(payment.amountCents)} payment from order #${order.reference}${next ? " (reopened as invoiced)" : ""}`,
+      category: "billing",
+      entityType: "order",
+      entityId: order.id,
+      createdAt: now,
+    });
+    return { reference: order.reference };
+  };
+
+export const makeListPayments =
+  ({ payments }: Pick<SalesDeps, "payments">) =>
+  (orderId: number) =>
+    payments.listForOrder(orderId);

@@ -1,10 +1,10 @@
 import "server-only";
-import { and, asc, count, desc, eq, gte, inArray, like, lt, lte, or, type SQL } from "drizzle-orm";
+import { and, asc, count, desc, eq, gte, inArray, like, lt, lte, or, sql, type SQL } from "drizzle-orm";
 import type { Database } from "@/server/db/connect";
 import { customers, orderItems, orders } from "@/server/db/schema";
 import { OPEN_ORDER_STATUSES, ORDER_STATUSES, overdueCutoff, type EffectiveOrderStatus, type OrderStatus } from "../domain/order";
 import { NotFoundError } from "../../shared-types";
-import type { NewOrder, Order, OrderListQuery, OrderRepository, OrderStatusChange } from "../application/ports";
+import type { NewOrder, Order, OrderListQuery, OrderRepository, OrderStatusChange, OrderUpdate } from "../application/ports";
 
 const orderColumns = {
   id: orders.id,
@@ -24,6 +24,7 @@ const orderColumns = {
   issueDate: orders.issueDate,
   dueDate: orders.dueDate,
   paidAt: orders.paidAt,
+  paidCents: sql<number>`coalesce((select sum(p.amount_cents) from payments p where p.order_id = ${orders.id}), 0)`.mapWith(Number),
 };
 
 /** SQL for a display status: overdue is derived from open status + due date, never stored. */
@@ -99,6 +100,15 @@ export class DrizzleOrderRepository implements OrderRepository {
     return { ...order, items };
   }
 
+  async findById(id: number) {
+    const [row] = await this.db
+      .select(orderColumns)
+      .from(orders)
+      .innerJoin(customers, eq(customers.id, orders.customerId))
+      .where(this.inWorkspace(eq(orders.id, id)));
+    return row ?? null;
+  }
+
   async countByStatus() {
     const rows = await this.db.select({ status: orders.status, n: count() }).from(orders).where(this.inWorkspace()).groupBy(orders.status);
     const result = Object.fromEntries(ORDER_STATUSES.map((s) => [s, 0])) as Record<OrderStatus, number>;
@@ -152,5 +162,23 @@ export class DrizzleOrderRepository implements OrderRepository {
 
   async updateStatus(id: number, change: OrderStatusChange) {
     await this.db.update(orders).set(change).where(this.inWorkspace(eq(orders.id, id)));
+  }
+
+  async update(id: number, { items, ...fields }: OrderUpdate) {
+    const [owner] = await this.db
+      .select({ id: customers.id })
+      .from(customers)
+      .where(and(eq(customers.id, fields.customerId), eq(customers.workspaceId, this.workspaceId)));
+    if (!owner) throw new NotFoundError("Customer", fields.customerId);
+    await this.db.transaction(async (tx) => {
+      const updated = await tx.update(orders).set(fields).where(this.inWorkspace(eq(orders.id, id))).returning({ id: orders.id });
+      if (updated.length === 0) throw new NotFoundError("Order", id);
+      await tx.delete(orderItems).where(eq(orderItems.orderId, id));
+      if (items.length) await tx.insert(orderItems).values(items.map((item, position) => ({ ...item, orderId: id, position })));
+    });
+  }
+
+  async delete(id: number) {
+    await this.db.delete(orders).where(this.inWorkspace(eq(orders.id, id)));
   }
 }

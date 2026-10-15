@@ -11,6 +11,8 @@ export interface RegisterRow {
   company: string;
   status: EffectiveOrderStatus;
   amount: string;
+  /** Paid / balance indicator; null when no payment was recorded. */
+  payment: { label: string; tone: "success" | "warning" } | null;
   date: string;
   href: string;
 }
@@ -104,6 +106,9 @@ export function SalesRegister({ tabs, rows, search, exportHref, footer }: SalesR
                     <OrderStatusBadge status={row.status} />
                   </span>
                   <span className="block truncate text-body-sm text-ink-subtle">{row.company}</span>
+                  {row.payment ? (
+                    <span className={cn("tabular block truncate text-body-sm", row.payment.tone === "success" ? "text-success" : "text-warning")}>{row.payment.label}</span>
+                  ) : null}
                 </span>
                 <span className="text-right">
                   <span className="tabular block text-headline-sm text-ink">{row.amount}</span>

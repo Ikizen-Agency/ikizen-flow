@@ -5,6 +5,7 @@ import { DrizzleCustomerRepository } from "@/modules/customers/infrastructure/dr
 import { DrizzleDashboardRepository } from "@/modules/dashboard/infrastructure/drizzle-dashboard-repository";
 import { makeChangeOrderStatus, makeCreateOrder } from "@/modules/sales/application/use-cases";
 import { DrizzleOrderRepository } from "@/modules/sales/infrastructure/drizzle-order-repository";
+import { DrizzlePaymentRepository } from "@/modules/sales/infrastructure/drizzle-payment-repository";
 import { makeCreateTask, makeMoveTask, makeToggleSubtask } from "@/modules/tasks/application/use-cases";
 import { DrizzleTaskRepository } from "@/modules/tasks/infrastructure/drizzle-task-repository";
 import { DrizzleMemberRepository } from "@/modules/team/infrastructure/drizzle-member-repository";
@@ -27,6 +28,7 @@ function scoped(workspaceId: number) {
   return {
     customers: new DrizzleCustomerRepository(db, workspaceId),
     orders: new DrizzleOrderRepository(db, workspaceId),
+    payments: new DrizzlePaymentRepository(db, workspaceId),
     tasks: new DrizzleTaskRepository(db, workspaceId),
     activity: new DrizzleActivityRepository(db, workspaceId),
     members: new DrizzleMemberRepository(db, workspaceId),

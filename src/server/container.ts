@@ -34,11 +34,17 @@ import { DrizzleSearchRepository } from "@/modules/search/infrastructure/drizzle
 import {
   makeChangeOrderStatus,
   makeCreateOrder,
+  makeDeleteOrder,
+  makeDeletePayment,
   makeGetOrder,
   makeGetSalesOverview,
   makeListOrders,
+  makeListPayments,
+  makeRecordPayment,
+  makeUpdateOrder,
 } from "@/modules/sales/application/use-cases";
 import { DrizzleOrderRepository } from "@/modules/sales/infrastructure/drizzle-order-repository";
+import { DrizzlePaymentRepository } from "@/modules/sales/infrastructure/drizzle-payment-repository";
 import { systemClock } from "@/modules/shared-types";
 import {
   makeAddSubtask,
@@ -72,6 +78,7 @@ export function forWorkspace(workspaceId: number) {
   const repositories = {
     customers: new DrizzleCustomerRepository(db, workspaceId),
     orders: new DrizzleOrderRepository(db, workspaceId),
+    payments: new DrizzlePaymentRepository(db, workspaceId),
     tasks: new DrizzleTaskRepository(db, workspaceId),
     activity: new DrizzleActivityRepository(db, workspaceId),
     members: new DrizzleMemberRepository(db, workspaceId),
@@ -108,6 +115,11 @@ export function forWorkspace(workspaceId: number) {
       changeStatus: makeChangeOrderStatus(deps),
       get: makeGetOrder(deps),
       overview: makeGetSalesOverview(deps),
+      update: makeUpdateOrder(deps),
+      delete: makeDeleteOrder(deps),
+      payments: makeListPayments(deps),
+      recordPayment: makeRecordPayment(deps),
+      deletePayment: makeDeletePayment(deps),
     },
     tasks: {
       board: makeGetTaskBoard(deps),

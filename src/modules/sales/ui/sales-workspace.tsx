@@ -10,18 +10,24 @@ import { parseOrderListParams } from "../application/list-params";
 import type { OrderWithItems } from "../application/ports";
 import {
   allowedOrderTransitions,
+  canDeleteOrder,
+  canEditOrder,
   effectiveOrderStatus,
   ORDER_CATEGORIES,
   ORDER_CATEGORY_LABELS,
   ORDER_STATUS_LABELS,
   PAYMENT_TERMS,
   PAYMENT_TERMS_LABELS,
+  OPEN_ORDER_STATUSES,
   type EffectiveOrderStatus,
   type OrderStatus,
 } from "../domain/order";
+import { orderBalance, PAYMENT_METHOD_LABELS, PAYMENT_METHODS } from "../domain/payment";
 import { OrderDrawer } from "./components/order-drawer";
+import { OrderManageActions } from "./components/order-manage-actions";
+import { OrderPayments } from "./components/order-payments";
 import type { StatusActionOption } from "./components/order-status-actions";
-import { SaleForm, type SaleItemDraft } from "./components/sale-form";
+import { SaleForm, type SaleFormEditing, type SaleItemDraft } from "./components/sale-form";
 import { SalesKpis, type SalesKpi } from "./components/sales-kpis";
 import { SalesRegister, type RegisterTab } from "./components/sales-register";
 import { VelocityCard } from "./components/velocity-card";
@@ -60,6 +66,14 @@ const ACTION_COPY: Record<OrderStatus, { label: string; icon: string }> = {
 const trendChip = (change: number | null, icon: string) =>
   change === null ? undefined : { icon, label: formatPercent(change, { signed: true }), tone: change >= 0 ? ("success" as const) : ("danger" as const) };
 
+/** Register indicator: "Paid", "Paid $X · Due $Y" for partial payments, or null when nothing was paid. */
+function paymentIndicator(o: { amountCents: number; paidCents: number }): { label: string; tone: "success" | "warning" } | null {
+  if (o.paidCents <= 0) return null;
+  const balance = orderBalance(o);
+  if (balance === 0) return { label: "Paid in full", tone: "success" };
+  return { label: `Paid ${formatMoney(o.paidCents, { decimals: false })} · Balance ${formatMoney(balance, { decimals: false })}`, tone: "warning" };
+}
+
 function toDraftItems(order: OrderWithItems | null): SaleItemDraft[] | null {
   if (!order?.items.length) return null;
   return order.items.map((i) => ({
@@ -78,6 +92,7 @@ export async function SalesWorkspace({ searchParams }: { searchParams: Promise<S
   const auditView = firstParam(params.view) === "all";
   const query = parseOrderListParams(params, { pageSize: auditView ? AUDIT_PAGE_SIZE : REGISTER_PAGE_SIZE });
   const orderRef = firstParam(params.order);
+  const editRef = firstParam(params.edit);
   const listParams = {
     status: query.status,
     q: query.search,
@@ -89,12 +104,33 @@ export async function SalesWorkspace({ searchParams }: { searchParams: Promise<S
   const { app } = await getWorkspaceApp("/sales");
   const overview = await app.sales.overview();
   const { now, kpis, counts } = overview;
-  const [register, customers, lastOrder, selected] = await Promise.all([
+  const [register, customers, lastOrder, selected, editingOrder] = await Promise.all([
     app.sales.list({ ...query, page: auditView ? query.page : 1 }),
     app.customers.list({ page: 1, pageSize: 500, sort: "company" }),
     overview.latestReference ? app.sales.get(overview.latestReference) : Promise.resolve(null),
     orderRef ? app.sales.get(orderRef) : Promise.resolve(null),
+    editRef ? app.sales.get(editRef) : Promise.resolve(null),
   ]);
+  const payments = selected ? await app.sales.payments(selected.id) : [];
+  const editing: SaleFormEditing | null =
+    editingOrder && canEditOrder(editingOrder.status)
+      ? {
+          reference: editingOrder.reference,
+          statusLabel: ORDER_STATUS_LABELS[editingOrder.status],
+          customerId: editingOrder.customerId,
+          category: editingOrder.category,
+          paymentTerms: editingOrder.paymentTerms,
+          earlySettlement: editingOrder.discountCents > 0,
+          items: toDraftItems(editingOrder) ?? [],
+          issueDateIso: editingOrder.issueDate.toISOString(),
+          cancelHref: hrefWith(PATH, listParams, { order: editingOrder.reference }),
+        }
+      : null;
+  const pickerCustomers = customers.items.map((c) => ({ id: c.id, company: c.company, email: c.billingEmail ?? c.contactEmail, outstandingCents: c.outstandingCents }));
+  // An archived client stays selectable while its existing order is being edited.
+  if (editingOrder && editing && !pickerCustomers.some((c) => c.id === editingOrder.customerId)) {
+    pickerCustomers.push({ id: editingOrder.customerId, company: editingOrder.customerCompany, email: "archived", outstandingCents: 0 });
+  }
 
   const kpiTiles: SalesKpi[] = [
     {
@@ -155,17 +191,16 @@ export async function SalesWorkspace({ searchParams }: { searchParams: Promise<S
       <div className="grid grid-cols-1 items-start gap-gutter lg:grid-cols-12">
         <div className="lg:col-span-7">
           <SaleForm
-            key={overview.nextReference}
-            customers={customers.items
-              .filter((c) => c.status !== "archived")
-              .map((c) => ({ id: c.id, company: c.company, email: c.billingEmail ?? c.contactEmail, outstandingCents: c.outstandingCents }))}
+            key={editing ? `edit-${editing.reference}` : overview.nextReference}
+            editing={editing}
+            customers={pickerCustomers}
             categoryOptions={ORDER_CATEGORIES.map((value) => ({ value, label: ORDER_CATEGORY_LABELS[value] }))}
             termsOptions={PAYMENT_TERMS.map((value) => ({ value, label: PAYMENT_TERMS_LABELS[value] }))}
             nextReference={overview.nextReference}
             todayIso={now.toISOString()}
             retainerTemplate={RETAINER_TEMPLATE}
             lastOrderItems={toDraftItems(lastOrder)}
-            highlighted={firstParam(params.create) === "1"}
+            highlighted={firstParam(params.create) === "1" || editing !== null}
           />
         </div>
         <div className="flex flex-col gap-gutter lg:col-span-5">
@@ -178,6 +213,7 @@ export async function SalesWorkspace({ searchParams }: { searchParams: Promise<S
               company: o.customerCompany,
               status: effectiveOrderStatus(o, now),
               amount: formatMoney(o.amountCents),
+              payment: paymentIndicator(o),
               date: formatDate(o.issueDate),
               href: hrefWith(PATH, listParams, { order: o.reference }),
             }))}
@@ -254,6 +290,36 @@ export async function SalesWorkspace({ searchParams }: { searchParams: Promise<S
             { label: "Total", value: formatMoney(selected.amountCents), strong: true },
           ]}
           actions={allowedOrderTransitions(selected.status).map((status): StatusActionOption => ({ status, ...ACTION_COPY[status] }))}
+          manage={
+            <OrderManageActions
+              reference={selected.reference}
+              editHref={canEditOrder(selected.status) ? hrefWith(PATH, { edit: selected.reference }) : null}
+              deletable={canDeleteOrder(selected.status)}
+            />
+          }
+          payments={
+            <OrderPayments
+              key={selected.reference}
+              reference={selected.reference}
+              total={formatMoney(selected.amountCents)}
+              paid={formatMoney(selected.paidCents)}
+              balance={formatMoney(orderBalance(selected))}
+              paidRatio={selected.amountCents > 0 ? selected.paidCents / selected.amountCents : 1}
+              payments={payments.map((p) => ({
+                id: p.id,
+                amount: formatMoney(p.amountCents),
+                method: PAYMENT_METHOD_LABELS[p.method],
+                date: formatDate(p.paidAt),
+                reference: p.reference,
+                note: p.note,
+                recordedBy: p.recordedByName,
+              }))}
+              canRecord={OPEN_ORDER_STATUSES.includes(selected.status) && orderBalance(selected) > 0}
+              balanceInput={(orderBalance(selected) / 100).toFixed(2)}
+              todayInput={now.toISOString().slice(0, 10)}
+              methodOptions={PAYMENT_METHODS.map((value) => ({ value, label: PAYMENT_METHOD_LABELS[value] }))}
+            />
+          }
         />
       ) : null}
     </div>

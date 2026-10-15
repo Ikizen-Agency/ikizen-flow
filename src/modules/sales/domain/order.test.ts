@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
+  assertOrderDeletable,
+  assertOrderEditable,
   assertOrderTransition,
+  canDeleteOrder,
+  canEditOrder,
+  OrderNotDeletableError,
+  OrderNotEditableError,
   canTransitionOrder,
   computeOrderTotals,
   daysOverdue,
@@ -121,5 +127,29 @@ describe("orderStatusTone", () => {
     expect(orderStatusTone("pending")).toBe("warning");
     expect(orderStatusTone("overdue")).toBe("danger");
     expect(orderStatusTone("draft")).toBe("neutral");
+  });
+});
+
+describe("order editing and deletion rules", () => {
+  it("lets drafts and pending orders be reopened in the composer", () => {
+    expect(canEditOrder("draft")).toBe(true);
+    expect(canEditOrder("pending")).toBe(true);
+    expect(() => assertOrderEditable("SL-1", "draft")).not.toThrow();
+  });
+
+  it("rejects editing orders that are in progress, invoiced or closed", () => {
+    for (const status of ["processing", "invoiced", "completed", "cancelled"] as const) {
+      expect(canEditOrder(status)).toBe(false);
+      expect(() => assertOrderEditable("SL-1", status)).toThrow(OrderNotEditableError);
+    }
+  });
+
+  it("only deletes drafts and cancelled orders", () => {
+    expect(canDeleteOrder("draft")).toBe(true);
+    expect(canDeleteOrder("cancelled")).toBe(true);
+    for (const status of ["pending", "processing", "invoiced", "completed"] as const) {
+      expect(canDeleteOrder(status)).toBe(false);
+      expect(() => assertOrderDeletable("SL-1", status)).toThrow(OrderNotDeletableError);
+    }
   });
 });

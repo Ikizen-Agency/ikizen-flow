@@ -1,11 +1,12 @@
 import { hasControlOrWhitespace } from "@/shared/domain/control-characters";
-export const NOTIFICATION_TYPES = ["task_assigned", "order_status", "payment_reminder", "mention", "system"] as const;
+export const NOTIFICATION_TYPES = ["task_assigned", "order_status", "payment_reminder", "payment_received", "mention", "system"] as const;
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
 
 export const NOTIFICATION_ICONS: Record<NotificationType, string> = {
   task_assigned: "assignment_ind",
   order_status: "receipt_long",
   payment_reminder: "notifications_active",
+  payment_received: "payments",
   mention: "alternate_email",
   system: "info",
 };

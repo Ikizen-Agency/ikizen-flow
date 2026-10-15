@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { Icon } from "@/shared/ui/icon";
 import { Overlay } from "@/shared/ui/overlay";
 import type { EffectiveOrderStatus } from "../../domain/order";
@@ -17,6 +18,10 @@ export interface OrderDrawerProps {
   items: ReadonlyArray<{ id: number; title: string; description: string | null; quantity: string; rate: string; total: string }>;
   totals: ReadonlyArray<{ label: string; value: string; strong?: boolean }>;
   actions: ReadonlyArray<StatusActionOption>;
+  /** Edit / delete controls. */
+  manage?: ReactNode;
+  /** Balance, payment history and the record payment form. */
+  payments?: ReactNode;
 }
 
 /** Slide-over order detail with line items, totals and lifecycle actions. */
@@ -77,10 +82,13 @@ export function OrderDrawer(props: OrderDrawerProps) {
           </dl>
         </section>
 
+        {props.payments}
+
         <section className="flex flex-col gap-space-sm">
           <h3 className="text-label-sm font-semibold tracking-wider text-ink-subtle uppercase">Update Status</h3>
           {props.storedStatusNote ? <p className="text-body-sm text-danger-strong">{props.storedStatusNote}</p> : null}
           <OrderStatusActions key={props.status} reference={props.reference} options={props.actions} />
+          {props.manage}
         </section>
       </div>
     </Overlay>

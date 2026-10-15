@@ -4,6 +4,7 @@ import { DrizzleCustomerRepository } from "@/modules/customers/infrastructure/dr
 import { makeChangeOrderStatus, makeCreateOrder } from "@/modules/sales/application/use-cases";
 import { InvalidOrderTransitionError } from "@/modules/sales/domain/order";
 import { DrizzleOrderRepository } from "@/modules/sales/infrastructure/drizzle-order-repository";
+import { DrizzlePaymentRepository } from "@/modules/sales/infrastructure/drizzle-payment-repository";
 import { makeGetTaskBoard, makeMoveTask } from "@/modules/tasks/application/use-cases";
 import { DrizzleTaskRepository } from "@/modules/tasks/infrastructure/drizzle-task-repository";
 import { createTestDatabase } from "@/test/test-database";
@@ -26,6 +27,7 @@ function deps() {
   return {
     customers: new DrizzleCustomerRepository(db, ws),
     orders: new DrizzleOrderRepository(db, ws),
+    payments: new DrizzlePaymentRepository(db, ws),
     tasks: new DrizzleTaskRepository(db, ws),
     activity: new DrizzleActivityRepository(db, ws),
     clock: () => now,
