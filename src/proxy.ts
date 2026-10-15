@@ -1,5 +1,6 @@
 import { getSessionCookie } from "better-auth/cookies";
 import { NextResponse, type NextRequest } from "next/server";
+import { isDataRoute } from "@/modules/auth/domain/redirect";
 
 /**
  * Optimistic route protection (Next 16 Proxy, formerly Middleware): only checks that a session cookie
@@ -10,7 +11,7 @@ export function proxy(request: NextRequest) {
   if (getSessionCookie(request)) return NextResponse.next();
 
   const { pathname, search } = request.nextUrl;
-  if (pathname.startsWith("/api/")) {
+  if (isDataRoute(pathname)) {
     return NextResponse.json({ error: "unauthorized", message: "Sign in to access this resource." }, { status: 401 });
   }
   const login = new URL("/login", request.url);

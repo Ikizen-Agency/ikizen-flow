@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { DEV_AUTH_SECRET, resolveAuthEnv } from "./auth-env";
-import { safeNextPath } from "./redirect";
+import { isDataRoute, safeNextPath } from "./redirect";
 
 describe("safeNextPath", () => {
   it("keeps same-origin relative paths with their query", () => {
@@ -40,5 +40,12 @@ describe("resolveAuthEnv", () => {
 
   it("lets `next build` compile without production secrets", () => {
     expect(resolveAuthEnv({ NODE_ENV: "production", NEXT_PHASE: "phase-production-build" }).secret).toBe(DEV_AUTH_SECRET);
+  });
+});
+
+describe("isDataRoute", () => {
+  it("treats API and CSV export routes as data (401 instead of a login redirect)", () => {
+    for (const path of ["/api/orders", "/customers/export", "/invoices/export", "/reports/export"]) expect(isDataRoute(path)).toBe(true);
+    for (const path of ["/", "/invoices", "/invoices/INV-2047", "/reports", "/exports", "/invoices/export/x"]) expect(isDataRoute(path)).toBe(false);
   });
 });

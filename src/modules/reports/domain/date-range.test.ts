@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_REPORT_PRESET, resolveReportRange } from "./date-range";
+import { DEFAULT_REPORT_PRESET, reportRangeUrlParams, resolveReportRange } from "./date-range";
 
 const now = new Date("2026-10-14T12:00:00Z");
 const day = (iso: string) => new Date(`${iso}T00:00:00Z`);
@@ -48,5 +48,12 @@ describe("resolveReportRange", () => {
   it("caps custom ranges at five years", () => {
     const range = resolveReportRange({ from: "2001-01-01", to: "2026-01-01" }, now);
     expect(range.start).toEqual(day("2021-01-02"));
+  });
+});
+
+describe("reportRangeUrlParams", () => {
+  it("keeps presets as a preset and custom ranges as from/to", () => {
+    expect(reportRangeUrlParams(resolveReportRange({ preset: "ytd" }, now))).toEqual({ preset: "ytd" });
+    expect(reportRangeUrlParams(resolveReportRange({ from: "2026-08-10", to: "2026-08-20" }, now))).toEqual({ preset: "custom", from: "2026-08-10", to: "2026-08-20" });
   });
 });

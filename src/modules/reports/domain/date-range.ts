@@ -83,3 +83,8 @@ export function resolveReportRange(params: ReportRangeParams, now: Date): Report
   }
   return presetRange((preset ?? DEFAULT_REPORT_PRESET) as Exclude<ReportPreset, "custom">, now);
 }
+
+/** URL params that reproduce a range: the preset alone, or `preset=custom` with inclusive from / to days. */
+export function reportRangeUrlParams(range: ReportRange): { preset: ReportPreset; from?: string; to?: string } {
+  return range.preset === "custom" ? { preset: "custom", from: range.fromInput, to: range.toInput } : { preset: range.preset };
+}

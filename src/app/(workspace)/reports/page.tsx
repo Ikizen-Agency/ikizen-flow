@@ -1,14 +1,13 @@
 import type { Metadata } from "next";
-import { ComingSoon } from "@/shared/shell/coming-soon";
+import { Suspense } from "react";
+import { ReportsWorkspace, ReportsWorkspaceSkeleton } from "@/modules/reports/ui/reports-workspace";
 
 export const metadata: Metadata = { title: "Reports" };
 
-export default function ReportsPage() {
+export default function ReportsPage({ searchParams }: PageProps<"/reports">) {
   return (
-    <ComingSoon
-      title="Reports"
-      icon="bar_chart"
-      description="Revenue, utilisation and pipeline reporting across the studio."
-    />
+    <Suspense fallback={<ReportsWorkspaceSkeleton />}>
+      <ReportsWorkspace searchParams={searchParams} />
+    </Suspense>
   );
 }

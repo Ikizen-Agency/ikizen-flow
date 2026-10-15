@@ -15,3 +15,8 @@ export function safeNextPath(next: string | null | undefined): string {
   if (AUTH_PAGES.some((page) => pathname === page || pathname.startsWith(`${page}/`))) return "/";
   return next;
 }
+
+/** Routes that return data (JSON APIs, `/<page>/export` CSV downloads): signed-out requests get 401, not a login redirect. */
+export function isDataRoute(pathname: string): boolean {
+  return pathname.startsWith("/api/") || /^\/[^/]+\/export$/.test(pathname);
+}

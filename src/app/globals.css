@@ -81,6 +81,9 @@
   --color-danger-tint: #fef2f2;
   --color-danger-line: #fecaca;
   --color-danger-border: #fca5a5;
+  /* Two-series chart palette (validated: lightness band, chroma, CVD and contrast vs #ffffff). */
+  --color-chart-1: #4338ca;
+  --color-chart-2: #0d9488;
   --color-neutral-strong: #475569;
   --color-scrim: rgb(15 23 42 / 0.4);
 
