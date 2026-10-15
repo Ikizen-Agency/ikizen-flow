@@ -102,6 +102,13 @@ export function OrderPayments(props: OrderPaymentsProps) {
         </p>
       ) : null}
 
+      {/* Outside the form: a payment that settles the balance closes the order and unmounts the form. */}
+      {state.status === "success" && state.message ? (
+        <p role="status" className="text-body-sm text-success">
+          {state.message}
+        </p>
+      ) : null}
+
       {props.canRecord ? (
         <form key={formKey} action={formAction} noValidate className="flex flex-col gap-space-sm rounded-card border border-line p-space-md">
           <h4 className="text-label-md font-semibold text-ink">Record Payment</h4>
@@ -129,8 +136,8 @@ export function OrderPayments(props: OrderPaymentsProps) {
           <Field label="Note" htmlFor="payment-note" error={err("note")}>
             <Input id="payment-note" name="note" maxLength={500} />
           </Field>
-          {state.message ? (
-            <p role={state.status === "error" ? "alert" : "status"} className={state.status === "error" ? "text-body-sm text-danger-strong" : "text-body-sm text-success"}>
+          {state.status === "error" && state.message ? (
+            <p role="alert" className="text-body-sm text-danger-strong">
               {state.message}
             </p>
           ) : null}
