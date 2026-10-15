@@ -16,8 +16,12 @@ const serverEnv = {
   SMTP_HOST: "",
 };
 
+/** `pnpm screenshots` sets this to run only `e2e/*.capture.ts` (README screenshots) instead of the specs. */
+const CAPTURE = Boolean(process.env.CAPTURE_SCREENSHOTS);
+
 export default defineConfig({
   testDir: "./e2e",
+  testMatch: CAPTURE ? "**/*.capture.ts" : "**/*.spec.ts",
   fullyParallel: false,
   workers: 1,
   forbidOnly: Boolean(process.env.CI),
