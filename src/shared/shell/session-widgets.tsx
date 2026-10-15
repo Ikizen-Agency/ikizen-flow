@@ -1,55 +1,21 @@
 import { signOutAction } from "@/modules/auth/ui/actions";
-import { switchWorkspaceAction } from "@/modules/workspaces/ui/actions";
+import { WORKSPACE_ROLE_LABELS } from "@/modules/workspaces/domain/workspace";
+import { WorkspaceSwitcherMenu } from "@/modules/workspaces/ui/components/workspace-switcher-menu";
 import { listMyWorkspaces } from "@/modules/workspaces/ui/queries";
 import { requireRequestContext } from "@/server/request-context";
 import { Avatar } from "@/shared/ui/avatar";
 import { Icon } from "@/shared/ui/icon";
+import { Breadcrumb } from "./breadcrumb";
+import { UserMenu } from "./user-menu";
 
 /**
  * Session-aware pieces of the shell. They read the request context (cookies + database session),
  * so the shell renders them inside `<Suspense>` boundaries.
  */
 
-/** Sidebar workspace card with a simple switcher menu (no-JS `<details>` + Server Action forms). */
+/** Sidebar workspace card with the switcher / create workspace menu. */
 export async function WorkspaceSwitcher() {
-  const workspaces = await listMyWorkspaces();
-  const active = workspaces.find((w) => w.active)!;
-  return (
-    <details className="group relative hidden lg:block">
-      <summary className="flex w-full cursor-pointer list-none items-center justify-between rounded-control bg-surface-container-low p-space-sm text-left transition-colors hover:bg-surface-container [&::-webkit-details-marker]:hidden">
-        <span className="flex min-w-0 flex-col pr-space-xs">
-          <span className="truncate text-label-md text-ink">{active.name}</span>
-          <span className="truncate text-body-sm text-ink-subtle">{active.tagline || active.roleLabel}</span>
-        </span>
-        <Icon name="unfold_more" size={18} className="text-outline" />
-        <span className="sr-only">Switch workspace</span>
-      </summary>
-      <div className="absolute inset-x-0 top-full z-10 mt-space-xs rounded-card border border-line bg-card p-space-xs shadow-level-2">
-        <p className="px-space-sm py-space-xs text-label-sm tracking-wider text-ink-subtle uppercase">Your workspaces</p>
-        <ul>
-          {workspaces.map((w) => (
-            <li key={w.id}>
-              <form action={switchWorkspaceAction}>
-                <input type="hidden" name="workspaceId" value={w.id} />
-                <button
-                  type="submit"
-                  aria-current={w.active ? "true" : undefined}
-                  className="flex w-full items-center gap-space-sm rounded-control px-space-sm py-space-xs text-left transition-colors hover:bg-surface-container-low"
-                >
-                  <Avatar name={w.name} size="sm" square />
-                  <span className="flex min-w-0 flex-1 flex-col">
-                    <span className="truncate text-label-md text-ink">{w.name}</span>
-                    <span className="truncate text-body-sm text-ink-subtle">{w.roleLabel}</span>
-                  </span>
-                  {w.active ? <Icon name="check" size={18} className="text-accent" /> : null}
-                </button>
-              </form>
-            </li>
-          ))}
-        </ul>
-      </div>
-    </details>
-  );
+  return <WorkspaceSwitcherMenu workspaces={await listMyWorkspaces()} />;
 }
 
 export function WorkspaceSwitcherSkeleton() {
@@ -84,15 +50,15 @@ export function SidebarUserCardSkeleton() {
 
 export async function WorkspaceBreadcrumb() {
   const { workspace } = await requireRequestContext();
-  return <span className="truncate text-headline-sm text-ink">{workspace.name}</span>;
+  return <Breadcrumb workspaceName={workspace.name} />;
 }
 
-/** Topbar avatar of the signed-in member (sign out lives in the sidebar card and the mobile "More" sheet). */
+export function WorkspaceBreadcrumbSkeleton() {
+  return <span className="hidden h-5 w-48 animate-pulse rounded-sm bg-surface-container-low sm:block" aria-hidden />;
+}
+
+/** Topbar avatar with the account menu. */
 export async function TopbarUser() {
-  const { member, workspace } = await requireRequestContext();
-  return (
-    <span title={`${member.name} · ${workspace.name}`}>
-      <Avatar name={member.name} />
-    </span>
-  );
+  const { user, member, role, workspace } = await requireRequestContext();
+  return <UserMenu name={member.name} email={user.email} title={member.role} roleLabel={WORKSPACE_ROLE_LABELS[role]} workspaceName={workspace.name} />;
 }

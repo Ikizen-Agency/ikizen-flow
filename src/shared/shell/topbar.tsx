@@ -1,8 +1,9 @@
 import { Suspense } from "react";
-import { Icon } from "@/shared/ui/icon";
+import { NotificationsMenu, NotificationsMenuSkeleton } from "@/modules/notifications/ui/notifications-menu";
+import { CommandPalette } from "@/modules/search/ui/command-palette";
 import { CreateNewMenu } from "./create-new-menu";
 import { Logo } from "./logo";
-import { TopbarUser, WorkspaceBreadcrumb } from "./session-widgets";
+import { TopbarUser, WorkspaceBreadcrumb, WorkspaceBreadcrumbSkeleton } from "./session-widgets";
 
 export function Topbar() {
   return (
@@ -12,36 +13,20 @@ export function Topbar() {
           <span className="md:hidden">
             <Logo size={28} />
           </span>
-          <nav aria-label="Breadcrumb" className="hidden items-center gap-space-sm sm:flex">
-            <span className="text-label-md text-ink-subtle">Workspace</span>
-            <span className="text-body-sm text-outline">/</span>
-            <Suspense fallback={<span className="h-5 w-32 animate-pulse rounded-sm bg-surface-container-low" aria-hidden />}>
-              <WorkspaceBreadcrumb />
-            </Suspense>
-          </nav>
+          <Suspense fallback={<WorkspaceBreadcrumbSkeleton />}>
+            <WorkspaceBreadcrumb />
+          </Suspense>
         </div>
-        <div className="hidden max-w-md flex-1 md:block">
-          <label className="relative flex w-full items-center">
-            <span className="sr-only">Search workspace</span>
-            <Icon name="search" size={18} className="pointer-events-none absolute left-space-sm text-outline" />
-            <input
-              type="search"
-              placeholder="Search workspace, orders, clients..."
-              className="h-[38px] w-full rounded-control bg-surface-container-low pr-12 pl-9 text-body-sm text-ink transition-all placeholder:text-ink-placeholder focus:bg-card focus:shadow-focus focus:outline-none"
-            />
-            <kbd className="absolute right-space-sm rounded-sm bg-surface-container px-1.5 py-0.5 text-[10px] text-outline">⌘K</kbd>
-          </label>
+        <div className="hidden max-w-md flex-1 justify-center md:flex">
+          <CommandPalette />
         </div>
         <div className="flex items-center gap-space-sm md:gap-space-md">
-          <button
-            type="button"
-            title="Notifications"
-            className="relative rounded-control p-space-xs text-ink-muted transition-colors hover:bg-well hover:text-ink"
-          >
-            <Icon name="notifications" size={20} />
-            <span className="absolute top-1 right-1 size-2 rounded-full bg-accent ring-2 ring-card" aria-hidden />
-            <span className="sr-only">You have unread notifications</span>
-          </button>
+          <span className="md:hidden">
+            <CommandPalette variant="icon" />
+          </span>
+          <Suspense fallback={<NotificationsMenuSkeleton />}>
+            <NotificationsMenu />
+          </Suspense>
           <CreateNewMenu />
           <Suspense fallback={<span className="size-8 animate-pulse rounded-full bg-surface-container-low" aria-hidden />}>
             <TopbarUser />
