@@ -1,5 +1,5 @@
 import "server-only";
-import { and, asc, desc, eq, inArray, isNull, lte, type SQL } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, lte, max, ne, sql, type SQL } from "drizzle-orm";
 import type { Database } from "@/server/db/connect";
 import { customers, members, taskSubtasks, tasks } from "@/server/db/schema";
 import type { NewTask, Subtask, Task, TaskBoardQuery, TaskRepository, TaskStatusUpdate } from "../application/ports";
@@ -23,6 +23,7 @@ const taskColumns = {
   commentCount: tasks.commentCount,
   completedAt: tasks.completedAt,
   createdAt: tasks.createdAt,
+  updatedAt: tasks.updatedAt,
 };
 
 export class DrizzleTaskRepository implements TaskRepository {
@@ -57,13 +58,14 @@ export class DrizzleTaskRepository implements TaskRepository {
       .leftJoin(members, eq(members.id, tasks.assigneeId));
   }
 
-  async listBoard({ assigneeId, customerId, priority, dueBefore }: TaskBoardQuery) {
+  async listBoard({ assigneeId, customerId, priority, dueBefore, openOnly }: TaskBoardQuery) {
     const filters: SQL[] = [];
     if (assigneeId) filters.push(eq(tasks.assigneeId, assigneeId));
     if (customerId === "internal") filters.push(isNull(tasks.customerId));
     else if (customerId) filters.push(eq(tasks.customerId, customerId));
     if (priority) filters.push(eq(tasks.priority, priority));
     if (dueBefore) filters.push(lte(tasks.dueAt, dueBefore));
+    if (openOnly) filters.push(ne(tasks.status, "completed"));
     const rows = await this.baseQuery()
       .where(filters.length ? and(...filters) : undefined)
       .orderBy(asc(tasks.position), asc(tasks.id));
@@ -97,5 +99,34 @@ export class DrizzleTaskRepository implements TaskRepository {
 
   async updateStatus(id: number, update: TaskStatusUpdate) {
     await this.db.update(tasks).set(update).where(eq(tasks.id, id));
+  }
+
+  async setSubtaskDone(taskId: number, subtaskId: number, done: boolean, now: Date) {
+    const updated = await this.db
+      .update(taskSubtasks)
+      .set({ done })
+      .where(and(eq(taskSubtasks.id, subtaskId), eq(taskSubtasks.taskId, taskId)))
+      .returning({ id: taskSubtasks.id });
+    if (updated.length === 0) return false;
+    await this.db.update(tasks).set({ updatedAt: now }).where(eq(tasks.id, taskId));
+    return true;
+  }
+
+  async addSubtask(taskId: number, title: string, now: Date) {
+    await this.db.transaction(async (tx) => {
+      const [row] = await tx
+        .select({ last: max(taskSubtasks.position) })
+        .from(taskSubtasks)
+        .where(eq(taskSubtasks.taskId, taskId));
+      await tx.insert(taskSubtasks).values({ taskId, title, position: (row?.last ?? -1) + 1 });
+      await tx.update(tasks).set({ updatedAt: now }).where(eq(tasks.id, taskId));
+    });
+  }
+
+  async incrementCommentCount(id: number, now: Date) {
+    await this.db
+      .update(tasks)
+      .set({ commentCount: sql`${tasks.commentCount} + 1`, updatedAt: now })
+      .where(eq(tasks.id, id));
   }
 }

@@ -1,18 +1,13 @@
 import type { Metadata } from "next";
-import { Card } from "@/shared/ui/card";
-import { EmptyState } from "@/shared/ui/empty-state";
-import { PageHeader } from "@/shared/ui/page-header";
+import { Suspense } from "react";
+import { TasksWorkspace, TasksWorkspaceSkeleton } from "@/modules/tasks/ui/tasks-workspace";
 
 export const metadata: Metadata = { title: "Tasks" };
 
-// Placeholder: implemented in a later task.
-export default function TasksPage() {
+export default function TasksPage({ searchParams }: PageProps<"/tasks">) {
   return (
-    <div className="flex flex-col gap-space-lg">
-      <PageHeader title="Tasks &amp; Operations" description="Active operational sprints across Northstar Studio client accounts." />
-      <Card>
-        <EmptyState icon="check_box" title="Nothing here yet" description="This workspace is being connected to live data." />
-      </Card>
-    </div>
+    <Suspense fallback={<TasksWorkspaceSkeleton />}>
+      <TasksWorkspace searchParams={searchParams} />
+    </Suspense>
   );
 }

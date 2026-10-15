@@ -26,6 +26,7 @@ export interface Task {
   commentCount: number;
   completedAt: Date | null;
   createdAt: Date;
+  updatedAt: Date;
   subtasks: Subtask[];
 }
 
@@ -35,6 +36,8 @@ export interface TaskBoardQuery {
   priority?: TaskPriority;
   /** Only tasks due on or before this instant. */
   dueBefore?: Date;
+  /** Exclude completed tasks. */
+  openOnly?: boolean;
 }
 
 export interface NewTask {
@@ -64,4 +67,8 @@ export interface TaskRepository {
   latestCode(): Promise<string | null>;
   create(task: NewTask, now: Date): Promise<Task>;
   updateStatus(id: number, update: TaskStatusUpdate): Promise<void>;
+  /** Returns false when the subtask does not belong to the task. */
+  setSubtaskDone(taskId: number, subtaskId: number, done: boolean, now: Date): Promise<boolean>;
+  addSubtask(taskId: number, title: string, now: Date): Promise<void>;
+  incrementCommentCount(id: number, now: Date): Promise<void>;
 }

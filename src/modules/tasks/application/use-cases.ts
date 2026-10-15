@@ -64,3 +64,45 @@ export const makeMoveTask =
       createdAt: now,
     });
   };
+
+const TIMELINE_LIMIT = 20;
+
+/** Slide-over detail: the task with its subtasks plus its activity timeline (newest first). */
+export const makeGetTaskDetail =
+  ({ tasks, activity }: Pick<TaskDeps, "tasks" | "activity">) =>
+  async (id: number) => {
+    const task = await tasks.findById(id);
+    if (!task) return null;
+    return { task, activity: await activity.forEntity("task", id, TIMELINE_LIMIT) };
+  };
+
+export const makeToggleSubtask =
+  ({ tasks, clock }: Pick<TaskDeps, "tasks" | "clock">) =>
+  async (taskId: number, subtaskId: number, done: boolean) => {
+    const found = await tasks.setSubtaskDone(taskId, subtaskId, done, clock());
+    if (!found) throw new NotFoundError("Subtask", subtaskId);
+  };
+
+export const makeAddSubtask =
+  ({ tasks, clock }: Pick<TaskDeps, "tasks" | "clock">) =>
+  async (taskId: number, title: string) => {
+    if (!(await tasks.findById(taskId))) throw new NotFoundError("Task", taskId);
+    await tasks.addSubtask(taskId, title, clock());
+  };
+
+/** Comments live in the activity log (shown in the task timeline) and bump the card's comment counter. */
+export const makeCommentOnTask =
+  ({ tasks, activity, clock }: TaskDeps) =>
+  async (taskId: number, body: string, actorId: number | null = null) => {
+    const now = clock();
+    if (!(await tasks.findById(taskId))) throw new NotFoundError("Task", taskId);
+    await tasks.incrementCommentCount(taskId, now);
+    await activity.record({
+      actorId,
+      message: `commented: ${body}`,
+      category: "operations",
+      entityType: "task",
+      entityId: taskId,
+      createdAt: now,
+    });
+  };

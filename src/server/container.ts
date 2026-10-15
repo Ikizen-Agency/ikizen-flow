@@ -18,7 +18,15 @@ import {
 } from "@/modules/sales/application/use-cases";
 import { DrizzleOrderRepository } from "@/modules/sales/infrastructure/drizzle-order-repository";
 import { systemClock } from "@/modules/shared-types";
-import { makeCreateTask, makeGetTaskBoard, makeMoveTask } from "@/modules/tasks/application/use-cases";
+import {
+  makeAddSubtask,
+  makeCommentOnTask,
+  makeCreateTask,
+  makeGetTaskBoard,
+  makeGetTaskDetail,
+  makeMoveTask,
+  makeToggleSubtask,
+} from "@/modules/tasks/application/use-cases";
 import { DrizzleTaskRepository } from "@/modules/tasks/infrastructure/drizzle-task-repository";
 import { DrizzleMemberRepository } from "@/modules/team/infrastructure/drizzle-member-repository";
 import { db } from "./db/client";
@@ -36,6 +44,9 @@ const repositories = {
 };
 
 const clock = systemClock;
+
+/** There is no authentication yet: the signed-in operator shown in the shell acts on every mutation. */
+const CURRENT_MEMBER_NAME = "Alex Vance";
 const deps = { ...repositories, clock };
 
 export const container = {
@@ -59,6 +70,14 @@ export const container = {
     board: makeGetTaskBoard(deps),
     create: makeCreateTask(deps),
     move: makeMoveTask(deps),
+    detail: makeGetTaskDetail(deps),
+    toggleSubtask: makeToggleSubtask(deps),
+    addSubtask: makeAddSubtask(deps),
+    comment: makeCommentOnTask(deps),
+  },
+  team: {
+    members: () => repositories.members.list(),
+    currentMember: () => repositories.members.findByName(CURRENT_MEMBER_NAME),
   },
   activity: {
     recent: makeListRecentActivity(deps),

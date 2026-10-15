@@ -1,14 +1,14 @@
 import "server-only";
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import type { Database } from "@/server/db/connect";
 import { activityEvents, members } from "@/server/db/schema";
-import type { NewActivityEvent } from "../domain/activity";
+import type { ActivityEntityType, NewActivityEvent } from "../domain/activity";
 import type { ActivityRepository } from "../application/ports";
 
 export class DrizzleActivityRepository implements ActivityRepository {
   constructor(private readonly db: Database) {}
 
-  recent(limit: number) {
+  private select() {
     return this.db
       .select({
         id: activityEvents.id,
@@ -20,7 +20,16 @@ export class DrizzleActivityRepository implements ActivityRepository {
         createdAt: activityEvents.createdAt,
       })
       .from(activityEvents)
-      .leftJoin(members, eq(members.id, activityEvents.actorId))
+      .leftJoin(members, eq(members.id, activityEvents.actorId));
+  }
+
+  recent(limit: number) {
+    return this.select().orderBy(desc(activityEvents.createdAt), desc(activityEvents.id)).limit(limit);
+  }
+
+  forEntity(entityType: ActivityEntityType, entityId: number, limit: number) {
+    return this.select()
+      .where(and(eq(activityEvents.entityType, entityType), eq(activityEvents.entityId, entityId)))
       .orderBy(desc(activityEvents.createdAt), desc(activityEvents.id))
       .limit(limit);
   }
