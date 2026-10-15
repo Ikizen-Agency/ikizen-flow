@@ -31,6 +31,19 @@ The user has a Stitch design export (`design/stitch_ikizen_flow_business_platfor
 - [x] T6 — Overview dashboard: KPIs, revenue trend chart, revenue by category, critical tasks, recent sales, activity, overdue receivables — all from DB aggregates. Route: delegated.
 - [x] T7 — README + final checks (lint, typecheck, test, build).
 
+### Phase 2 — fully operational app (user requirement 2026-10-15: "la página completa debe estar operativa y funcional")
+Decisions: auth = email + password via Better Auth on Drizzle/SQLite (user choice). Defaults: emails go to a DB outbox (viewable in-app) and are sent via SMTP only when env vars are set; attachments stored on local disk (`data/uploads`); invoices derive from orders + new payments table; reports from DB aggregates.
+- [ ] T8 — Auth + workspaces: Better Auth (register, login, logout, sessions), users ↔ members, workspaces + memberships, all data scoped by workspace, route protection, `currentMember()` from session, seed demo user. Route: delegated.
+- [ ] T9 — Shell + notifications + email outbox: ⌘K global search, notifications table + panel (mark read), per-route breadcrumb, user menu, workspace switcher/create, in-app Help page, outbox + SMTP mailer infra. Route: delegated.
+- [ ] T10 — Customers CRUD: edit, status change, archive, delete, row More menu, bulk actions (campaign email, tier tag, archive, delete). Route: delegated.
+- [ ] T11 — Sales CRUD: edit/reopen drafts, delete drafts/cancelled, payments table + record payment. Route: delegated.
+- [ ] T12 — Tasks CRUD: edit/delete, reassign, due/priority, blocked reason, log hours, real comments (edit/delete), @mentions → notifications, attachments (disk), board text search. Route: delegated.
+- [ ] T13 — Invoices page: list/filter, invoice detail (printable), send invoice (outbox), record payment. Route: delegated.
+- [ ] T14 — Reports page: date range, revenue by month/category/customer, task throughput, CSV export. Route: delegated.
+- [ ] T15 — Settings page: workspace profile, members (add/remove/role), profile + password change, email/outbox viewer, notification prefs. Route: delegated.
+- [ ] T16 — Dashboard completion: working Filters, Send Reminder via mailer, live refresh, activity "view all". Route: delegated.
+- [ ] T17 — E2E: Playwright flows for auth + every mutation; final checks. Route: delegated.
+
 ## Acceptance criteria
 - `pnpm dev` runs; all 4 screens match the design visually and read from the DB.
 - Mutations persist and revalidate the UI.
@@ -66,5 +79,7 @@ Strategy: `ask-on-risk`. Forecast: well over 400 authored lines (greenfield) —
 
 - T7 (inline, single doc file): `README.md` (features, stack, setup, scripts, architecture conventions). Final checks: `pnpm db:reset` ok; `pnpm typecheck` ok; `pnpm lint` exit 0; `pnpm test` 27 files / 136 tests pass; `pnpm build` ok (/, /customers, /sales, /tasks partial prerender; /api/orders, /customers/export dynamic). Pending: manual browser pass of Server Actions and drag and drop.
 
+- Review T5–T7 (base cea60f7): assessed medium (slice_budget_reached); consent declined by user for this candidate. T7 commit: `297d76f`.
+
 ## Next step
-Manual browser QA (forms, drag and drop); then decide delivery (chain strategy before PRs). Follow-ups: auth, Invoices/Reports/Settings pages, `cn` without Tailwind class merging.
+Phase 2, starting at T8 (auth + workspaces). Delivery (push/PRs, chain strategy) remains the user's decision.
