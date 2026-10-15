@@ -12,6 +12,12 @@ describe("safeNextPath", () => {
       expect(safeNextPath(next)).toBe("/");
     }
   });
+
+  it("rejects control characters and whitespace that browsers strip into protocol-relative URLs", () => {
+    for (const next of ["/\t/evil.test", "/\n/evil.test", "/\r/evil.test", "/ /evil.test", "/\u0000/evil.test"]) {
+      expect(safeNextPath(next)).toBe("/");
+    }
+  });
 });
 
 describe("resolveAuthEnv", () => {
