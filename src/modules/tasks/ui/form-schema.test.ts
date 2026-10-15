@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addSubtaskSchema, createTaskSchema, moveTaskSchema, taskCommentSchema, toggleSubtaskSchema } from "./form-schema";
+import { addSubtaskSchema, createTaskSchema, moveTaskSchema, taskCommentSchema, toggleSubtaskSchema, updateTaskSchema } from "./form-schema";
 
 describe("createTaskSchema", () => {
   it("normalizes a complete form into a task", () => {
@@ -64,5 +64,34 @@ describe("task mutation schemas", () => {
     expect(addSubtaskSchema.safeParse({ taskId: "1", title: "  " }).success).toBe(false);
     expect(taskCommentSchema.parse({ taskId: "1", body: "  Looks good  " })).toEqual({ taskId: 1, body: "Looks good" });
     expect(taskCommentSchema.safeParse({ taskId: "1", body: "x".repeat(1001) }).success).toBe(false);
+  });
+});
+
+describe("updateTaskSchema", () => {
+  const form = { taskId: "3", title: "Ship", status: "todo", priority: "low", customerId: "internal", assigneeId: "" };
+
+  it("parses the edit form without subtasks", () => {
+    expect(updateTaskSchema.parse({ ...form, blockedReason: "ignored" })).toMatchObject({
+      taskId: 3,
+      title: "Ship",
+      customerId: null,
+      assigneeId: null,
+      blockedReason: null,
+      dueAt: null,
+    });
+  });
+
+  it("requires a blocked reason for blocked tasks", () => {
+    const result = updateTaskSchema.safeParse({ ...form, status: "blocked", blockedReason: "  " });
+    expect(result.success).toBe(false);
+    expect(result.error?.issues[0]?.path).toEqual(["blockedReason"]);
+    expect(updateTaskSchema.parse({ ...form, status: "blocked", blockedReason: " Legal " }).blockedReason).toBe("Legal");
+  });
+});
+
+describe("moveTaskSchema", () => {
+  it("accepts an optional blocked reason", () => {
+    expect(moveTaskSchema.parse({ taskId: 1, status: "blocked", blockedReason: " Vendor " })).toEqual({ taskId: 1, status: "blocked", blockedReason: "Vendor" });
+    expect(moveTaskSchema.parse({ taskId: 1, status: "todo" })).toEqual({ taskId: 1, status: "todo" });
   });
 });

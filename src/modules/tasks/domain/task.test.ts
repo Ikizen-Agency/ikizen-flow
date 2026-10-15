@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { applyTaskStatusChange, compareTasksForBoard, nextTaskCode, subtaskProgress, taskDueState } from "./task";
+import {
+  applyTaskStatusChange,
+  BlockedReasonRequiredError,
+  compareTasksForBoard,
+  duplicateTaskTitle,
+  nextTaskCode,
+  normalizeBlockedReason,
+  subtaskProgress,
+  taskDueState,
+} from "./task";
 
 const now = new Date("2026-10-14T12:00:00Z");
 
@@ -37,6 +46,34 @@ describe("applyTaskStatusChange", () => {
     const blocked = applyTaskStatusChange(base, "blocked", now, "Waiting on client sign-off");
     expect(blocked.blockedReason).toBe("Waiting on client sign-off");
     expect(applyTaskStatusChange({ ...blocked }, "in_progress", now).blockedReason).toBeNull();
+  });
+
+  it("requires a reason when a task moves to blocked", () => {
+    expect(() => applyTaskStatusChange(base, "blocked", now)).toThrow(BlockedReasonRequiredError);
+    expect(() => applyTaskStatusChange(base, "blocked", now, "   ")).toThrow(BlockedReasonRequiredError);
+  });
+
+  it("keeps the current reason of an already blocked task unless a new one is given", () => {
+    const blocked = { status: "blocked" as const, completedAt: null, blockedReason: "Pending Stripe review" };
+    expect(applyTaskStatusChange(blocked, "blocked", now).blockedReason).toBe("Pending Stripe review");
+    expect(applyTaskStatusChange(blocked, "blocked", now, " Legal review ").blockedReason).toBe("Legal review");
+  });
+});
+
+describe("normalizeBlockedReason", () => {
+  it("trims, collapses whitespace and caps the length", () => {
+    expect(normalizeBlockedReason("  Waiting   on\nclient ")).toBe("Waiting on client");
+    expect(normalizeBlockedReason("")).toBeNull();
+    expect(normalizeBlockedReason(null)).toBeNull();
+    expect(normalizeBlockedReason("x".repeat(500))).toHaveLength(200);
+  });
+});
+
+describe("duplicateTaskTitle", () => {
+  it("marks the copy and keeps it within the title limit", () => {
+    expect(duplicateTaskTitle("Launch site")).toBe("Launch site (copy)");
+    expect(duplicateTaskTitle("t".repeat(160))).toHaveLength(160);
+    expect(duplicateTaskTitle("t".repeat(160)).endsWith(" (copy)")).toBe(true);
   });
 });
 

@@ -17,8 +17,12 @@ describe("parseTaskBoardParams", () => {
         task: "12",
         create: "1",
         status: "blocked",
+        q: "  wire   frames ",
+        edit: "7",
       }),
     ).toEqual({
+      q: "wire frames",
+      editId: 7,
       view: "list",
       assigneeId: 3,
       priority: "urgent",
@@ -35,6 +39,8 @@ describe("parseTaskBoardParams", () => {
       parseTaskBoardParams({ view: "grid", assignee: "x", priority: "asap", client: "-4", due: "1y", task: "0", status: "done" }),
     ).toEqual({ view: "kanban", create: false });
     expect(parseTaskBoardParams({ client: ["7", "8"] }).client).toBe(7);
+    expect(parseTaskBoardParams({ q: "   " }).q).toBeUndefined();
+    expect(parseTaskBoardParams({ q: "x".repeat(200) }).q).toHaveLength(80);
   });
 });
 
@@ -46,6 +52,8 @@ describe("taskFilterQuery", () => {
       priority: undefined,
       client: undefined,
       due: "today",
+      q: undefined,
     });
+    expect(taskFilterQuery(parseTaskBoardParams({ q: "brand" })).q).toBe("brand");
   });
 });

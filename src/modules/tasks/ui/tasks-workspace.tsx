@@ -8,7 +8,7 @@ import type { Task } from "../application/ports";
 import { parseTaskBoardParams, taskFilterQuery } from "../application/board-params";
 import { describeTaskDue, DUE_FILTER_LABELS, DUE_FILTERS, dueWindow, operationalKpis, summarizeBoard } from "../domain/board";
 import { compareTasksForBoard, subtaskProgress, TASK_PRIORITIES, TASK_PRIORITY_LABELS, TASK_STATUS_LABELS, TASK_STATUSES, type TaskStatus } from "../domain/task";
-import { CreateTaskDialog } from "./components/create-task-dialog";
+import { CreateTaskDialog, EditTaskDialog, type TaskFormValues } from "./components/task-form-dialog";
 import type { TaskCardModel } from "./components/task-badges";
 import { TaskBoard } from "./components/task-board";
 import { TaskDrawer } from "./components/task-drawer";
@@ -27,6 +27,26 @@ const DUE_OPTIONS = DUE_FILTERS.map((value) => ({ value, label: DUE_FILTER_LABEL
 
 const milestoneDate = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" });
 
+const pad = (n: number) => String(n).padStart(2, "0");
+
+/** Edit form values; dates use the server's zone, like the create form parser. */
+function taskFormValues(t: Task): TaskFormValues {
+  const due = t.dueAt;
+  return {
+    title: t.title,
+    description: t.description ?? "",
+    status: t.status,
+    priority: t.priority,
+    customerId: t.customerId ? String(t.customerId) : "internal",
+    assigneeId: t.assigneeId ? String(t.assigneeId) : "",
+    dueDate: due ? `${due.getFullYear()}-${pad(due.getMonth() + 1)}-${pad(due.getDate())}` : "",
+    dueTime: due ? `${pad(due.getHours())}:${pad(due.getMinutes())}` : "",
+    estimateHours: t.estimateHours ? String(t.estimateHours) : "",
+    tags: t.tags.join(", "),
+    blockedReason: t.blockedReason ?? "",
+  };
+}
+
 /** Container: reads URL state and the database, then renders the presentational board. */
 export async function TasksWorkspace({ searchParams }: { searchParams: Promise<SearchParamsRecord> }) {
   await connection();
@@ -35,17 +55,19 @@ export async function TasksWorkspace({ searchParams }: { searchParams: Promise<S
   const now = app.clock();
   const filters = taskFilterQuery(params);
 
-  const [all, board, members, customers, detail] = await Promise.all([
+  const [all, board, members, customers, detail, editing] = await Promise.all([
     app.repositories.tasks.listBoard({}),
     app.tasks.board({
       assigneeId: params.assigneeId,
       priority: params.priority,
       customerId: params.client,
+      q: params.q,
       ...dueWindow(params.due, now),
     }),
     app.team.members(),
     app.repositories.customers.listOptions(),
     params.taskId ? app.tasks.detail(params.taskId) : Promise.resolve(null),
+    params.editId ? app.repositories.tasks.findById(params.editId) : Promise.resolve(null),
   ]);
 
   const toCard = (t: Task): TaskCardModel => ({
@@ -116,6 +138,7 @@ export async function TasksWorkspace({ searchParams }: { searchParams: Promise<S
       {detail ? (
         <TaskDrawer
           closeHref={closeHref}
+          editHref={hrefWith(PATH, filters, { edit: detail.task.id })}
           task={{
             id: detail.task.id,
             code: detail.task.code,
@@ -124,6 +147,7 @@ export async function TasksWorkspace({ searchParams }: { searchParams: Promise<S
             internal: detail.task.customerCompany === null,
             priority: detail.task.priority,
             status: detail.task.status,
+            blockedReason: detail.task.blockedReason,
             assigneeName: detail.task.assigneeName,
             due: describeTaskDue(detail.task, now),
             estimate: `${detail.task.estimateHours ? `${detail.task.estimateHours} Hours` : "Not estimated"} (${detail.task.trackedHours} Tracked)`,
@@ -135,6 +159,19 @@ export async function TasksWorkspace({ searchParams }: { searchParams: Promise<S
             const text = comment ? a.message.slice(COMMENT_PREFIX.length) : a.message.charAt(0).toUpperCase() + a.message.slice(1);
             return { id: a.id, actor: a.actorName ?? "System", when: formatRelativeTime(a.createdAt, now), text, comment };
           })}
+        />
+      ) : null}
+
+      {editing ? (
+        <EditTaskDialog
+          closeHref={hrefWith(PATH, filters, { task: editing.id })}
+          taskId={editing.id}
+          code={editing.code}
+          initial={taskFormValues(editing)}
+          statusOptions={STATUS_OPTIONS}
+          priorityOptions={PRIORITY_OPTIONS}
+          clientOptions={customers.map((c) => ({ value: String(c.id), label: c.company }))}
+          memberOptions={members.map((m) => ({ value: String(m.id), label: m.name }))}
         />
       ) : null}
 

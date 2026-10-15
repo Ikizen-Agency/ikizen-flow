@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState, useEffect, useOptimistic, useRef, useState, useTransition } from "react";
+import { useActionState, useEffect, useRef } from "react";
 import { cn } from "@/shared/lib/cn";
 import { Avatar } from "@/shared/ui/avatar";
 import { Button } from "@/shared/ui/button";
@@ -9,12 +9,16 @@ import { Icon } from "@/shared/ui/icon";
 import { Overlay } from "@/shared/ui/overlay";
 import type { DueDescriptor } from "../../domain/board";
 import { TASK_STATUS_LABELS, type TaskPriority, type TaskStatus } from "../../domain/task";
-import { addSubtaskAction, commentOnTaskAction, toggleSubtaskAction } from "../actions";
+import { commentOnTaskAction } from "../actions";
 import type { TaskMutationResult } from "../form-schema";
 import { ClientBadge, DueLabel, PriorityBadge, STATUS_DOT } from "./task-badges";
+import { TaskBlocker } from "./task-blocker";
+import { TaskChecklist } from "./task-checklist";
+import { TaskDrawerMenu } from "./task-drawer-menu";
 
 export interface TaskDrawerProps {
   closeHref: string;
+  editHref: string;
   task: {
     id: number;
     code: string;
@@ -23,6 +27,7 @@ export interface TaskDrawerProps {
     internal: boolean;
     priority: TaskPriority;
     status: TaskStatus;
+    blockedReason: string | null;
     assigneeName: string | null;
     due: DueDescriptor | null;
     estimate: string;
@@ -44,40 +49,14 @@ function Meta({ label, children }: { label: string; children: React.ReactNode })
 }
 
 /** `?task=<id>` slide-over: metadata, description, a live subtask checklist and the activity/comment timeline. */
-export function TaskDrawer({ closeHref, task, timeline }: TaskDrawerProps) {
+export function TaskDrawer({ closeHref, editHref, task, timeline }: TaskDrawerProps) {
   const done = task.status === "completed";
-  const [subtasks, toggleOptimistic] = useOptimistic(task.subtasks, (state, change: { id: number; done: boolean }) =>
-    state.map((s) => (s.id === change.id ? { ...s, done: change.done } : s)),
-  );
-  const [, startTransition] = useTransition();
-  const [subtaskError, setSubtaskError] = useState<string | null>(null);
-  const [adding, setAdding] = useState(false);
-  const [addState, addAction, addPending] = useActionState(addSubtaskAction, IDLE);
   const [commentState, commentAction, commentPending] = useActionState(commentOnTaskAction, IDLE);
   const commentForm = useRef<HTMLFormElement>(null);
-  const addForm = useRef<HTMLFormElement>(null);
 
   useEffect(() => {
     if (commentState.ok && !commentPending) commentForm.current?.reset();
   }, [commentState, commentPending]);
-  useEffect(() => {
-    if (addState.ok && !addPending) addForm.current?.reset();
-  }, [addState, addPending]);
-
-  const completedCount = subtasks.filter((s) => s.done).length;
-
-  const toggle = (id: number, next: boolean) => {
-    setSubtaskError(null);
-    startTransition(async () => {
-      toggleOptimistic({ id, done: next });
-      const fd = new FormData();
-      fd.set("taskId", String(task.id));
-      fd.set("subtaskId", String(id));
-      fd.set("done", String(next));
-      const result = await toggleSubtaskAction(fd);
-      if (!result.ok) setSubtaskError(result.message ?? "The checklist could not be updated.");
-    });
-  };
 
   return (
     <Overlay closeHref={closeHref} variant="drawer" labelledBy="task-drawer-title">
@@ -93,9 +72,7 @@ export function TaskDrawer({ closeHref, task, timeline }: TaskDrawerProps) {
           </h2>
         </div>
         <div className="flex shrink-0 items-center gap-1">
-          <button type="button" disabled title="More options (coming soon)" className="rounded-control p-1 text-ink-subtle disabled:opacity-50">
-            <Icon name="more_vert" size={20} />
-          </button>
+          <TaskDrawerMenu taskId={task.id} code={task.code} title={task.title} editHref={editHref} />
           <Link href={closeHref} scroll={false} aria-label="Close" className="rounded-control p-1 text-ink-subtle hover:text-ink">
             <Icon name="close" size={20} />
           </Link>
@@ -103,6 +80,8 @@ export function TaskDrawer({ closeHref, task, timeline }: TaskDrawerProps) {
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col gap-space-lg overflow-y-auto p-space-lg">
+        {task.status === "blocked" ? <TaskBlocker key={task.id} taskId={task.id} reason={task.blockedReason} /> : null}
+
         <dl className="grid grid-cols-1 gap-space-md rounded-card bg-surface-container-low p-space-md sm:grid-cols-2">
           <Meta label="Assignee">
             {task.assigneeName ? (
@@ -133,61 +112,7 @@ export function TaskDrawer({ closeHref, task, timeline }: TaskDrawerProps) {
           </div>
         </section>
 
-        <section aria-labelledby="task-checklist">
-          <div className="flex items-center justify-between gap-space-sm">
-            <div className="flex items-center gap-2">
-              <h3 id="task-checklist" className="text-headline-sm text-ink">
-                Subtasks Checklist
-              </h3>
-              <span className="tabular rounded-full bg-accent-tint px-2 py-0.5 text-label-sm text-accent">
-                {completedCount}/{subtasks.length}
-              </span>
-            </div>
-            <button type="button" onClick={() => setAdding((v) => !v)} className="inline-flex items-center gap-1 text-label-md text-accent hover:underline">
-              <Icon name="add" size={16} />
-              Add item
-            </button>
-          </div>
-          {subtaskError ? (
-            <p role="alert" className="mt-space-sm text-body-sm text-danger-strong">
-              {subtaskError}
-            </p>
-          ) : null}
-          <ul className="mt-space-sm flex flex-col">
-            {subtasks.map((s) => (
-              <li key={s.id}>
-                <label className="flex cursor-pointer items-center gap-space-sm rounded-control px-1 py-2 hover:bg-surface-container-low">
-                  <input
-                    type="checkbox"
-                    checked={s.done}
-                    onChange={(e) => toggle(s.id, e.target.checked)}
-                    className="size-4 accent-accent"
-                  />
-                  <span className={cn("text-body-md", s.done ? "text-ink-subtle line-through" : "text-ink")}>{s.title}</span>
-                </label>
-              </li>
-            ))}
-            {subtasks.length === 0 && !adding ? <li className="py-2 text-body-sm text-ink-subtle">No checklist items yet.</li> : null}
-          </ul>
-          {adding ? (
-            <form ref={addForm} action={addAction} className="mt-space-sm flex items-center gap-space-sm">
-              <input type="hidden" name="taskId" value={task.id} />
-              <input
-                name="title"
-                required
-                maxLength={160}
-                autoFocus
-                aria-label="New checklist item"
-                placeholder="Describe the next step..."
-                className="h-9 min-w-0 flex-1 rounded-control border border-line bg-card px-space-sm text-body-sm text-ink focus:shadow-focus focus:outline-none"
-              />
-              <Button type="submit" size="sm" disabled={addPending}>
-                {addPending ? "Adding..." : "Add"}
-              </Button>
-            </form>
-          ) : null}
-          {!addState.ok ? <p className="mt-1 text-body-sm text-danger-strong">{addState.message}</p> : null}
-        </section>
+        <TaskChecklist key={task.id} taskId={task.id} items={task.subtasks} />
 
         <section aria-labelledby="task-activity">
           <h3 id="task-activity" className="text-headline-sm text-ink">

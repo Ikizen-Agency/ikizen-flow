@@ -4,7 +4,10 @@ import Link from "next/link";
 import { useOptimistic, useState, useTransition, type DragEvent } from "react";
 import { cn } from "@/shared/lib/cn";
 import { Avatar } from "@/shared/ui/avatar";
+import { Button } from "@/shared/ui/button";
+import { Dialog } from "@/shared/ui/dialog";
 import { Icon } from "@/shared/ui/icon";
+import { Input } from "@/shared/ui/input";
 import { moveTaskInList } from "../../domain/board";
 import { TASK_STATUS_LABELS, TASK_STATUSES, type TaskStatus } from "../../domain/task";
 import { moveTaskAction } from "../actions";
@@ -37,17 +40,24 @@ export function TaskBoard({ tasks, createHrefs }: TaskBoardProps) {
   const [dropTarget, setDropTarget] = useState<TaskStatus | null>(null);
   const [announcement, setAnnouncement] = useState("");
   const [error, setError] = useState<string | null>(null);
+  /** Task waiting for a blocker explanation before it moves to "Blocked". */
+  const [blocking, setBlocking] = useState<TaskCardModel | null>(null);
+
+  const persistMove = (task: TaskCardModel, status: TaskStatus, blockedReason?: string) => {
+    setError(null);
+    startTransition(async () => {
+      applyMove({ id: task.id, status });
+      const result = await moveTaskAction(task.id, status, blockedReason);
+      if (result.ok) setAnnouncement(`Moved "${task.title}" to ${TASK_STATUS_LABELS[status]}.`);
+      else setError(result.message ?? "The task could not be moved.");
+    });
+  };
 
   const move = (id: number, status: TaskStatus) => {
     const task = optimistic.find((t) => t.id === id);
     if (!task || task.status === status) return;
-    setError(null);
-    startTransition(async () => {
-      applyMove({ id, status });
-      const result = await moveTaskAction(id, status);
-      if (result.ok) setAnnouncement(`Moved "${task.title}" to ${TASK_STATUS_LABELS[status]}.`);
-      else setError(result.message ?? "The task could not be moved.");
-    });
+    if (status === "blocked") setBlocking(task);
+    else persistMove(task, status);
   };
 
   const onDrop = (status: TaskStatus) => (e: DragEvent<HTMLElement>) => {
@@ -67,6 +77,14 @@ export function TaskBoard({ tasks, createHrefs }: TaskBoardProps) {
           {error}
         </p>
       ) : null}
+      <BlockedReasonDialog
+        task={blocking}
+        onClose={() => setBlocking(null)}
+        onConfirm={(reason) => {
+          if (blocking) persistMove(blocking, "blocked", reason);
+          setBlocking(null);
+        }}
+      />
       <div className="-mx-margin-mobile flex snap-x gap-gutter overflow-x-auto px-margin-mobile pb-space-sm md:mx-0 md:px-0 lg:grid lg:grid-cols-4 lg:overflow-visible">
         {TASK_STATUSES.map((status) => {
           const cards = optimistic.filter((t) => t.status === status);
@@ -129,6 +147,46 @@ export function TaskBoard({ tasks, createHrefs }: TaskBoardProps) {
         })}
       </div>
     </>
+  );
+}
+
+/** Small prompt shown before a card moves to "Blocked": the reason is required. */
+function BlockedReasonDialog({ task, onClose, onConfirm }: { task: TaskCardModel | null; onClose: () => void; onConfirm: (reason: string) => void }) {
+  return (
+    <Dialog open={task !== null} onClose={onClose} labelledBy="blocked-reason-title">
+      <form
+        className="flex flex-col gap-space-md p-space-lg"
+        onSubmit={(e) => {
+          e.preventDefault();
+          const reason = String(new FormData(e.currentTarget).get("reason") ?? "").trim();
+          if (reason) onConfirm(reason);
+        }}
+      >
+        <div className="flex items-start gap-space-md">
+          <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-full bg-accent-tint text-accent">
+            <Icon name="pause_circle" size={20} />
+          </span>
+          <div className="flex min-w-0 flex-col gap-1">
+            <h2 id="blocked-reason-title" className="text-headline-sm text-ink">
+              Why is this task blocked?
+            </h2>
+            <p className="truncate text-body-sm text-ink-muted">{task?.title}</p>
+          </div>
+        </div>
+        <label className="flex flex-col gap-1.5">
+          <span className="text-label-md text-ink-muted">Blocked reason</span>
+          <Input name="reason" required maxLength={200} autoFocus placeholder="e.g. Waiting on client sign-off" />
+        </label>
+        <div className="flex justify-end gap-space-sm">
+          <Button variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button type="submit" icon="block">
+            Move to Blocked
+          </Button>
+        </div>
+      </form>
+    </Dialog>
   );
 }
 

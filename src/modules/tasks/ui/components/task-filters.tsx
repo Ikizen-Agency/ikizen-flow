@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname, useRouter } from "next/navigation";
-import { useTransition, type ReactNode } from "react";
+import { useEffect, useRef, useState, useTransition, type ReactNode } from "react";
 import { cn } from "@/shared/lib/cn";
 import { Avatar } from "@/shared/ui/avatar";
 import { hrefWith, type QueryValue } from "@/shared/ui/href";
@@ -38,7 +38,9 @@ function FilterSelect({ icon, label, value, onChange, children }: { icon: string
   );
 }
 
-/** Assignee / priority / client / due filters. Every change rewrites the URL so the board filters on the server. */
+const SEARCH_DEBOUNCE_MS = 300;
+
+/** Text search plus assignee / priority / client / due filters. Every change rewrites the URL so the board filters on the server. */
 export function TaskFilters({ current, members, priorityOptions, clientOptions, dueOptions, criticalBlockers }: TaskFiltersProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -47,10 +49,46 @@ export function TaskFilters({ current, members, priorityOptions, clientOptions, 
     startTransition(() => router.replace(hrefWith(pathname, current, updates), { scroll: false }));
 
   const selectedAssignee = current.assignee ? Number(current.assignee) : null;
+  const currentQuery = String(current.q ?? "");
+  const [search, setSearch] = useState(currentQuery);
+  /** Set by "Clear filters" so emptying the box does not re-navigate with the stale filters. */
+  const cleared = useRef(false);
+
+  useEffect(() => {
+    if (cleared.current) {
+      cleared.current = false;
+      return;
+    }
+    if (search.trim() === currentQuery) return;
+    const timer = setTimeout(() => navigate({ q: search.trim() || undefined }), SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- navigate is recreated every render; debounce only on input.
+  }, [search]);
 
   return (
     <div className={cn("rounded-card border border-line bg-card p-space-md shadow-level-1", pending && "opacity-80")}>
       <div className="flex flex-wrap items-center gap-space-md">
+        <form
+          role="search"
+          className="relative w-full md:w-64"
+          onSubmit={(e) => {
+            e.preventDefault();
+            navigate({ q: search.trim() || undefined });
+          }}
+        >
+          <Icon name="search" size={18} className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-outline" />
+          <input
+            type="search"
+            name="q"
+            value={search}
+            maxLength={80}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search tasks, codes, descriptions..."
+            aria-label="Search tasks"
+            className="h-[34px] w-full rounded-control bg-surface-container-low pr-3 pl-10 text-body-sm text-ink transition-all placeholder:text-ink-placeholder focus:bg-card focus:shadow-focus focus:outline-none"
+          />
+        </form>
+
         <div className="flex items-center gap-space-sm">
           <span className="text-label-sm tracking-[0.08em] text-ink-subtle uppercase">Assignees</span>
           <div className="flex -space-x-1.5" role="group" aria-label="Filter by assignee">
@@ -124,7 +162,13 @@ export function TaskFilters({ current, members, priorityOptions, clientOptions, 
             type="button"
             title="Clear Filters"
             aria-label="Clear filters"
-            onClick={() => startTransition(() => router.replace(hrefWith(pathname, { view: current.view }), { scroll: false }))}
+            onClick={() => {
+              if (search) {
+                cleared.current = true;
+                setSearch("");
+              }
+              startTransition(() => router.replace(hrefWith(pathname, { view: current.view }), { scroll: false }));
+            }}
             className="rounded-control p-2 text-outline transition-colors hover:bg-surface-container-low hover:text-ink"
           >
             <Icon name="restart_alt" size={18} />

@@ -5,15 +5,22 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { getWorkspaceApp } from "@/server/request-context";
 import { NotFoundError } from "../../shared-types";
-import type { TaskStatus } from "../domain/task";
+import { TaskNotBlockedError } from "../application/use-cases";
+import { BlockedReasonRequiredError, type TaskStatus } from "../domain/task";
 import {
   addSubtaskSchema,
+  blockedReasonSchema,
   createTaskSchema,
+  deleteSubtaskSchema,
   moveTaskSchema,
+  renameSubtaskSchema,
   taskCommentSchema,
+  taskIdSchema,
   toggleSubtaskSchema,
+  updateTaskSchema,
   type CreateTaskState,
   type TaskMutationResult,
+  type UpdateTaskState,
 } from "./form-schema";
 
 function revalidateTasks() {
@@ -27,8 +34,11 @@ function textEntries(formData: FormData): Record<string, string> {
   return values;
 }
 
+/** Domain errors carry user-facing messages; anything else is logged and reported generically. */
 function failure(error: unknown, action: string): TaskMutationResult {
-  if (error instanceof NotFoundError) return { ok: false, message: error.message };
+  if (error instanceof NotFoundError || error instanceof BlockedReasonRequiredError || error instanceof TaskNotBlockedError) {
+    return { ok: false, message: error.message };
+  }
   console.error(`${action} failed`, error);
   return { ok: false, message: "The change could not be saved. Please try again." };
 }
@@ -52,13 +62,58 @@ export async function createTaskAction(_prev: CreateTaskState, formData: FormDat
   redirect(`/tasks?task=${id}`);
 }
 
-/** Drag-and-drop and the "Move to" menu both land here; the domain keeps completion metadata consistent. */
-export async function moveTaskAction(taskId: number, status: TaskStatus): Promise<TaskMutationResult> {
+/** "Edit Task" dialog: saves every field (reassignment notifies the new assignee), then reopens the task. */
+export async function updateTaskAction(_prev: UpdateTaskState, formData: FormData): Promise<UpdateTaskState> {
   const { ctx, app } = await getWorkspaceApp();
-  const parsed = moveTaskSchema.safeParse({ taskId, status });
+  const values = textEntries(formData);
+  const parsed = updateTaskSchema.safeParse(values);
+  if (!parsed.success) {
+    return { status: "error", message: "Please fix the highlighted fields.", fieldErrors: z.flattenError(parsed.error).fieldErrors, values };
+  }
+  const { taskId, ...input } = parsed.data;
+  try {
+    await app.tasks.update(taskId, input, ctx.member.id);
+  } catch (error) {
+    return { status: "error", message: failure(error, "updateTaskAction").message, values };
+  }
+  revalidateTasks();
+  redirect(`/tasks?task=${taskId}`);
+}
+
+export async function deleteTaskAction(_prev: TaskMutationResult, formData: FormData): Promise<TaskMutationResult> {
+  const { ctx, app } = await getWorkspaceApp();
+  const parsed = taskIdSchema.safeParse(textEntries(formData));
+  if (!parsed.success) return { ok: false, message: "Invalid task." };
+  try {
+    await app.tasks.delete(parsed.data.taskId, ctx.member.id);
+  } catch (error) {
+    return failure(error, "deleteTaskAction");
+  }
+  revalidateTasks();
+  redirect("/tasks");
+}
+
+export async function duplicateTaskAction(_prev: TaskMutationResult, formData: FormData): Promise<TaskMutationResult> {
+  const { ctx, app } = await getWorkspaceApp();
+  const parsed = taskIdSchema.safeParse(textEntries(formData));
+  if (!parsed.success) return { ok: false, message: "Invalid task." };
+  let id: number;
+  try {
+    id = (await app.tasks.duplicate(parsed.data.taskId, ctx.member.id)).id;
+  } catch (error) {
+    return failure(error, "duplicateTaskAction");
+  }
+  revalidateTasks();
+  redirect(`/tasks?task=${id}`);
+}
+
+/** Drag-and-drop and the "Move to" menu both land here; moving to Blocked requires a reason. */
+export async function moveTaskAction(taskId: number, status: TaskStatus, blockedReason?: string): Promise<TaskMutationResult> {
+  const { ctx, app } = await getWorkspaceApp();
+  const parsed = moveTaskSchema.safeParse({ taskId, status, blockedReason });
   if (!parsed.success) return { ok: false, message: "Invalid move." };
   try {
-    await app.tasks.move(parsed.data.taskId, parsed.data.status, { actorId: ctx.member.id });
+    await app.tasks.move(parsed.data.taskId, parsed.data.status, { actorId: ctx.member.id, blockedReason: parsed.data.blockedReason });
   } catch (error) {
     return failure(error, "moveTaskAction");
   }
@@ -66,12 +121,25 @@ export async function moveTaskAction(taskId: number, status: TaskStatus): Promis
   return { ok: true };
 }
 
+export async function setBlockedReasonAction(_prev: TaskMutationResult, formData: FormData): Promise<TaskMutationResult> {
+  const { ctx, app } = await getWorkspaceApp();
+  const parsed = blockedReasonSchema.safeParse(textEntries(formData));
+  if (!parsed.success) return { ok: false, message: "Explain why the task is blocked." };
+  try {
+    await app.tasks.setBlockedReason(parsed.data.taskId, parsed.data.reason!, ctx.member.id);
+  } catch (error) {
+    return failure(error, "setBlockedReasonAction");
+  }
+  revalidateTasks();
+  return { ok: true };
+}
+
 export async function toggleSubtaskAction(formData: FormData): Promise<TaskMutationResult> {
-  const { app } = await getWorkspaceApp();
+  const { ctx, app } = await getWorkspaceApp();
   const parsed = toggleSubtaskSchema.safeParse(textEntries(formData));
   if (!parsed.success) return { ok: false, message: "Invalid subtask." };
   try {
-    await app.tasks.toggleSubtask(parsed.data.taskId, parsed.data.subtaskId, parsed.data.done);
+    await app.tasks.toggleSubtask(parsed.data.taskId, parsed.data.subtaskId, parsed.data.done, ctx.member.id);
   } catch (error) {
     return failure(error, "toggleSubtaskAction");
   }
@@ -80,13 +148,39 @@ export async function toggleSubtaskAction(formData: FormData): Promise<TaskMutat
 }
 
 export async function addSubtaskAction(_prev: TaskMutationResult, formData: FormData): Promise<TaskMutationResult> {
-  const { app } = await getWorkspaceApp();
+  const { ctx, app } = await getWorkspaceApp();
   const parsed = addSubtaskSchema.safeParse(textEntries(formData));
   if (!parsed.success) return { ok: false, message: "Enter a checklist item (up to 160 characters)." };
   try {
-    await app.tasks.addSubtask(parsed.data.taskId, parsed.data.title);
+    await app.tasks.addSubtask(parsed.data.taskId, parsed.data.title, ctx.member.id);
   } catch (error) {
     return failure(error, "addSubtaskAction");
+  }
+  revalidateTasks();
+  return { ok: true };
+}
+
+export async function renameSubtaskAction(_prev: TaskMutationResult, formData: FormData): Promise<TaskMutationResult> {
+  const { ctx, app } = await getWorkspaceApp();
+  const parsed = renameSubtaskSchema.safeParse(textEntries(formData));
+  if (!parsed.success) return { ok: false, message: "Enter a checklist item (up to 160 characters)." };
+  try {
+    await app.tasks.renameSubtask(parsed.data.taskId, parsed.data.subtaskId, parsed.data.title, ctx.member.id);
+  } catch (error) {
+    return failure(error, "renameSubtaskAction");
+  }
+  revalidateTasks();
+  return { ok: true };
+}
+
+export async function deleteSubtaskAction(formData: FormData): Promise<TaskMutationResult> {
+  const { ctx, app } = await getWorkspaceApp();
+  const parsed = deleteSubtaskSchema.safeParse(textEntries(formData));
+  if (!parsed.success) return { ok: false, message: "Invalid subtask." };
+  try {
+    await app.tasks.deleteSubtask(parsed.data.taskId, parsed.data.subtaskId, ctx.member.id);
+  } catch (error) {
+    return failure(error, "deleteSubtaskAction");
   }
   revalidateTasks();
   return { ok: true };

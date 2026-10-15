@@ -1,9 +1,13 @@
 import "server-only";
-import { and, asc, desc, eq, inArray, isNull, lte, max, ne, sql, type SQL } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, lte, max, ne, or, sql, type AnyColumn, type SQL } from "drizzle-orm";
 import type { Database } from "@/server/db/connect";
 import { customers, members, taskSubtasks, tasks } from "@/server/db/schema";
+import { likePattern } from "../../search/domain/search";
 import { NotFoundError } from "../../shared-types";
-import type { NewTask, Subtask, Task, TaskBoardQuery, TaskRepository, TaskStatusUpdate } from "../application/ports";
+import type { NewTask, Subtask, Task, TaskBoardQuery, TaskChanges, TaskRepository, TaskStatusUpdate } from "../application/ports";
+
+/** Case-insensitive LIKE with `\\` as the escape character (patterns come from `likePattern`). */
+const like = (column: AnyColumn, pattern: string): SQL => sql`${column} like ${pattern} escape '\\'`;
 
 const taskColumns = {
   id: tasks.id,
@@ -90,7 +94,7 @@ export class DrizzleTaskRepository implements TaskRepository {
       .leftJoin(members, eq(members.id, tasks.assigneeId));
   }
 
-  async listBoard({ assigneeId, customerId, priority, dueBefore, openOnly }: TaskBoardQuery) {
+  async listBoard({ assigneeId, customerId, priority, dueBefore, openOnly, q }: TaskBoardQuery) {
     const filters: SQL[] = [eq(tasks.workspaceId, this.workspaceId)];
     if (assigneeId) filters.push(eq(tasks.assigneeId, assigneeId));
     if (customerId === "internal") filters.push(isNull(tasks.customerId));
@@ -98,6 +102,10 @@ export class DrizzleTaskRepository implements TaskRepository {
     if (priority) filters.push(eq(tasks.priority, priority));
     if (dueBefore) filters.push(lte(tasks.dueAt, dueBefore));
     if (openOnly) filters.push(ne(tasks.status, "completed"));
+    if (q) {
+      const pattern = likePattern(q);
+      filters.push(or(like(tasks.title, pattern), like(tasks.code, pattern), like(tasks.description, pattern))!);
+    }
     const rows = await this.baseQuery()
       .where(and(...filters))
       .orderBy(asc(tasks.position), asc(tasks.id));
@@ -132,6 +140,39 @@ export class DrizzleTaskRepository implements TaskRepository {
 
   async updateStatus(id: number, update: TaskStatusUpdate) {
     await this.db.update(tasks).set(update).where(this.inWorkspace(eq(tasks.id, id)));
+  }
+
+  async update(id: number, { customerId, assigneeId, ...changes }: TaskChanges) {
+    if (!(await this.owns(id))) throw new NotFoundError("Task", id);
+    await this.assertReferences({ customerId, assigneeId });
+    await this.db
+      .update(tasks)
+      .set({ ...changes, ...(customerId !== undefined && { customerId }), ...(assigneeId !== undefined && { assigneeId }) })
+      .where(this.inWorkspace(eq(tasks.id, id)));
+  }
+
+  async delete(id: number) {
+    const deleted = await this.db.delete(tasks).where(this.inWorkspace(eq(tasks.id, id))).returning({ id: tasks.id });
+    return deleted.length > 0;
+  }
+
+  async renameSubtask(taskId: number, subtaskId: number, title: string, now: Date) {
+    return this.changeSubtask(taskId, subtaskId, now, (where) =>
+      this.db.update(taskSubtasks).set({ title }).where(where).returning({ id: taskSubtasks.id }),
+    );
+  }
+
+  async deleteSubtask(taskId: number, subtaskId: number, now: Date) {
+    return this.changeSubtask(taskId, subtaskId, now, (where) => this.db.delete(taskSubtasks).where(where).returning({ id: taskSubtasks.id }));
+  }
+
+  /** Runs a subtask write only when the task is in the workspace and owns the subtask; bumps `updatedAt`. */
+  private async changeSubtask(taskId: number, subtaskId: number, now: Date, write: (where: SQL) => Promise<Array<{ id: number }>>) {
+    if (!(await this.owns(taskId))) return false;
+    const rows = await write(and(eq(taskSubtasks.id, subtaskId), eq(taskSubtasks.taskId, taskId))!);
+    if (rows.length === 0) return false;
+    await this.db.update(tasks).set({ updatedAt: now }).where(eq(tasks.id, taskId));
+    return true;
   }
 
   async setSubtaskDone(taskId: number, subtaskId: number, done: boolean, now: Date) {

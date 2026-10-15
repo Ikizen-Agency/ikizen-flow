@@ -12,8 +12,12 @@ export interface TaskBoardParams {
   /** Customer id, or "internal" for studio work without a client. */
   client?: number | "internal";
   due?: DueFilter;
+  /** Free-text search over title, code and description. */
+  q?: string;
   /** Task shown in the detail slide-over. */
   taskId?: number;
+  /** Task opened in the edit dialog. */
+  editId?: number;
   create: boolean;
   /** Column preselected in the create form ("+" on a column header). */
   createStatus?: TaskStatus;
@@ -21,6 +25,14 @@ export interface TaskBoardParams {
 
 function oneOf<T extends string>(allowed: ReadonlyArray<T>, value: string | undefined): T | undefined {
   return allowed.includes(value as T) ? (value as T) : undefined;
+}
+
+export const TASK_SEARCH_MAX_LENGTH = 80;
+
+/** Trimmed, whitespace-collapsed board search (undefined when empty). */
+function searchText(value: string | undefined): string | undefined {
+  const q = (value ?? "").replace(/\s+/g, " ").trim().slice(0, TASK_SEARCH_MAX_LENGTH).trim();
+  return q || undefined;
 }
 
 function positiveInt(value: string | undefined): number | undefined {
@@ -37,7 +49,9 @@ export function parseTaskBoardParams(params: SearchParamsRecord): TaskBoardParam
     priority: oneOf(TASK_PRIORITIES, firstParam(params.priority)),
     client: client === "internal" ? "internal" : positiveInt(client),
     due: oneOf(DUE_FILTERS, firstParam(params.due)),
+    q: searchText(firstParam(params.q)),
     taskId: positiveInt(firstParam(params.task)),
+    editId: positiveInt(firstParam(params.edit)),
     create: firstParam(params.create) === "1",
     createStatus: oneOf(TASK_STATUSES, firstParam(params.status)),
   };
@@ -53,5 +67,6 @@ export function taskFilterQuery(p: TaskBoardParams): Record<string, QueryValue> 
     priority: p.priority,
     client: p.client,
     due: p.due,
+    q: p.q,
   };
 }

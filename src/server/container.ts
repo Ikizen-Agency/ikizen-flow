@@ -50,10 +50,16 @@ import {
   makeAddSubtask,
   makeCommentOnTask,
   makeCreateTask,
+  makeDeleteSubtask,
+  makeDeleteTask,
+  makeDuplicateTask,
   makeGetTaskBoard,
   makeGetTaskDetail,
   makeMoveTask,
+  makeRenameSubtask,
+  makeSetBlockedReason,
   makeToggleSubtask,
+  makeUpdateTask,
 } from "@/modules/tasks/application/use-cases";
 import { DrizzleTaskRepository } from "@/modules/tasks/infrastructure/drizzle-task-repository";
 import { DrizzleMemberRepository } from "@/modules/team/infrastructure/drizzle-member-repository";
@@ -125,9 +131,15 @@ export function forWorkspace(workspaceId: number) {
       board: makeGetTaskBoard(deps),
       create: makeCreateTask(deps),
       move: makeMoveTask(deps),
+      update: makeUpdateTask(deps),
+      delete: makeDeleteTask(deps),
+      duplicate: makeDuplicateTask(deps),
+      setBlockedReason: makeSetBlockedReason(deps),
       detail: makeGetTaskDetail(deps),
       toggleSubtask: makeToggleSubtask(deps),
       addSubtask: makeAddSubtask(deps),
+      renameSubtask: makeRenameSubtask(deps),
+      deleteSubtask: makeDeleteSubtask(deps),
       comment: makeCommentOnTask(deps),
     },
     team: {

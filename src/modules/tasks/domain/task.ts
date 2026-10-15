@@ -39,18 +39,50 @@ interface StatusFields {
   blockedReason: string | null;
 }
 
-/** Any column move is allowed; this keeps completion and blocker metadata consistent. */
+export const TASK_TITLE_MAX = 160;
+export const BLOCKED_REASON_MAX = 200;
+
+export class BlockedReasonRequiredError extends Error {
+  constructor() {
+    super("Explain why the task is blocked.");
+    this.name = "BlockedReasonRequiredError";
+  }
+}
+
+/** Single-line, trimmed blocker explanation (null when empty). */
+export function normalizeBlockedReason(reason: string | null | undefined): string | null {
+  const text = (reason ?? "").replace(/\s+/g, " ").trim().slice(0, BLOCKED_REASON_MAX).trim();
+  return text || null;
+}
+
+/**
+ * Any column move is allowed; this keeps completion and blocker metadata consistent.
+ * Blocked tasks always carry a reason: `blockedReason` replaces the current one when given
+ * (`undefined` keeps it), and leaving the blocked column clears it.
+ */
 export function applyTaskStatusChange(
   task: StatusFields,
   status: TaskStatus,
   now: Date,
   blockedReason?: string | null,
 ): StatusFields {
+  let reason: string | null = null;
+  if (status === "blocked") {
+    reason = blockedReason === undefined ? normalizeBlockedReason(task.status === "blocked" ? task.blockedReason : null) : normalizeBlockedReason(blockedReason);
+    if (!reason) throw new BlockedReasonRequiredError();
+  }
   return {
     status,
     completedAt: status === "completed" ? (task.status === "completed" ? task.completedAt : now) : null,
-    blockedReason: status === "blocked" ? (blockedReason ?? task.blockedReason ?? null) : null,
+    blockedReason: reason,
   };
+}
+
+const COPY_SUFFIX = " (copy)";
+
+/** Title of a duplicated task: "<title> (copy)", truncated to fit the title limit. */
+export function duplicateTaskTitle(title: string): string {
+  return `${title.slice(0, TASK_TITLE_MAX - COPY_SUFFIX.length).trimEnd()}${COPY_SUFFIX}`;
 }
 
 const PRIORITY_RANK: Record<TaskPriority, number> = { urgent: 0, high: 1, medium: 2, low: 3 };
