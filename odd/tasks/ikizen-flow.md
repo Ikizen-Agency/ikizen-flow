@@ -24,7 +24,7 @@ The user has a Stitch design export (`design/stitch_ikizen_flow_business_platfor
 
 ## Tasks
 - [x] T1 — Scaffold Next.js + Tailwind design tokens + app shell (sidebar, topbar, responsive) + Vitest. Route: delegated (writer, 2+ non-trivial files).
-- [ ] T2 — Data layer: Drizzle schema (customers, orders, tasks, activity), migrations, seed with design data, repositories. Route: delegated.
+- [x] T2 — Data layer: Drizzle schema (customers, orders, tasks, activity), migrations, seed with design data, repositories. Route: delegated.
 - [ ] T3 — Customers directory: list/search/filter + create customer (Server Action). Route: delegated.
 - [ ] T4 — Sales orders management: list/filters/totals + create order + status change. Route: delegated.
 - [ ] T5 — Tasks kanban: columns by status, create task, move task between statuses. Route: delegated.
@@ -40,7 +40,9 @@ The user has a Stitch design export (`design/stitch_ikizen_flow_business_platfor
 Strategy: `ask-on-risk`. Forecast: well over 400 authored lines (greenfield) — chain strategy to be asked before PRs; local work-unit commits per task.
 
 ## Progress / Evidence
-- T1 (delegated writer): Next.js 16.4.1 (App Router, Turbopack, `cacheComponents` + `partialPrefetching` on by template default), Tailwind v4 tokens in `src/app/globals.css`, shell in `src/shared/shell/`, UI primitives in `src/shared/ui/`, placeholder routes under `src/app/(workspace)/`. Verified: `pnpm install` ok; `pnpm typecheck` ok; `pnpm lint` 0 problems; `pnpm test` pass; `pnpm build` ok (8 static routes); `next start` smoke: /customers renders with active nav, /invoices 200. Commit: (this commit).
+- T1 (delegated writer): Next.js 16.4.1 (App Router, Turbopack, `cacheComponents` + `partialPrefetching` on by template default), Tailwind v4 tokens in `src/app/globals.css`, shell in `src/shared/shell/`, UI primitives in `src/shared/ui/`, placeholder routes under `src/app/(workspace)/`. Verified: `pnpm install` ok; `pnpm typecheck` ok; `pnpm lint` 0 problems; `pnpm test` pass; `pnpm build` ok (8 static routes); `next start` smoke: /customers renders with active nav, /invoices 200. Commit: `28fee5e`.
+
+- T2 (delegated writer): Drizzle ORM 0.45 + @libsql/client, schema `src/server/db/schema.ts` (members, customers, orders, order_items, tasks, task_subtasks, activity_events), migration `drizzle/0000_*.sql`, deterministic relative-date seed (14 customers, 47 orders ending at SL-1048, 13 tasks, 8 activity events). Modules `src/modules/{customers,sales,tasks,activity,team}/{domain,application,infrastructure}`, composition root `src/server/container.ts`. Domain tests (money, time, order transitions/overdue/totals, task due state/moves, customer rules) were written before the implementation, but RED was not observed: dependencies were still installing when the implementation was written. Data-layer integration test runs against a temp SQLite file. Verified: `pnpm db:reset` ok; `pnpm typecheck` ok; `pnpm lint` 0 problems; `pnpm test` 8 files / 46 tests pass; `pnpm build` ok. Commit: see `git log` (T2 work-unit commit after `28fee5e`).
 
 ## Next step
-T2.
+T3 (customers directory).
