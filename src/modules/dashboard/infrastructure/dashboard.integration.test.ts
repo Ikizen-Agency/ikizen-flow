@@ -13,19 +13,21 @@ import { DrizzleDashboardRepository } from "./drizzle-dashboard-repository";
 const now = new Date("2026-10-14T12:00:00Z");
 let db: Database;
 let cleanup: () => void;
+/** Northstar Studio, the workspace holding the design dataset. */
+let ws: number;
 
 beforeAll(async () => {
   ({ db, cleanup } = await createTestDatabase());
-  await seedDatabase(db, now);
+  ws = (await seedDatabase(db, now)).workspaces.northstar;
 });
 afterAll(() => cleanup());
 
 const deps = () => ({
-  dashboard: new DrizzleDashboardRepository(db),
-  orders: new DrizzleOrderRepository(db),
-  customers: new DrizzleCustomerRepository(db),
-  tasks: new DrizzleTaskRepository(db),
-  activity: new DrizzleActivityRepository(db),
+  dashboard: new DrizzleDashboardRepository(db, ws),
+  orders: new DrizzleOrderRepository(db, ws),
+  customers: new DrizzleCustomerRepository(db, ws),
+  tasks: new DrizzleTaskRepository(db, ws),
+  activity: new DrizzleActivityRepository(db, ws),
   clock: () => now,
 });
 
@@ -61,13 +63,13 @@ describe("payment reminders", () => {
     const view = await makeGetDashboard(deps())({ period: "month", metric: "gross" });
     const target = view.overdue.items[0]!;
     await makeSendPaymentReminder(deps())(target.reference, null);
-    const [latest] = await new DrizzleActivityRepository(db).recent(1);
+    const [latest] = await new DrizzleActivityRepository(db, ws).recent(1);
     expect(latest).toMatchObject({ category: "billing", entityType: "order", entityId: target.id });
     expect(latest?.message).toContain(`sent payment reminder to ${target.customerCompany}`);
   });
 
   it("refuses reminders for orders that are not overdue or do not exist", async () => {
-    const orders = new DrizzleOrderRepository(db);
+    const orders = new DrizzleOrderRepository(db, ws);
     const page = await orders.list({ status: "completed", asOf: now, pageSize: 1 });
     const completed = page.items[0]!;
     expect(effectiveOrderStatus(completed, now)).toBe("completed");

@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import { container } from "@/server/container";
+import { getWorkspaceApp } from "@/server/request-context";
 import { DuplicateCustomerError } from "../application/use-cases";
 import { createCustomerSchema, type CreateCustomerState } from "./form-schema";
 
@@ -15,6 +15,7 @@ function textEntries(formData: FormData): Record<string, string> {
 
 /** Creates a customer (and an optional draft order for the initial engagement), then opens its profile. */
 export async function createCustomerAction(_prev: CreateCustomerState, formData: FormData): Promise<CreateCustomerState> {
+  const { ctx, app } = await getWorkspaceApp();
   const values = textEntries(formData);
   const parsed = createCustomerSchema.safeParse(values);
   if (!parsed.success) {
@@ -24,7 +25,7 @@ export async function createCustomerAction(_prev: CreateCustomerState, formData:
   const { initialAmountCents, ...input } = parsed.data;
   let customerId: number;
   try {
-    const customer = await container.customers.create(input);
+    const customer = await app.customers.create(input, ctx.member.id);
     customerId = customer.id;
   } catch (error) {
     if (error instanceof DuplicateCustomerError) {
@@ -35,14 +36,14 @@ export async function createCustomerAction(_prev: CreateCustomerState, formData:
   }
 
   if (initialAmountCents) {
-    await container.sales.create({
+    await app.sales.create({
       customerId,
       title: "Initial engagement",
       category: "custom_software",
       paymentTerms: "net_30",
       status: "draft",
       items: [{ title: "Initial engagement", quantity: 1, unitRateCents: initialAmountCents }],
-    });
+    }, ctx.member.id);
   }
 
   revalidatePath("/customers");

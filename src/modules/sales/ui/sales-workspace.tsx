@@ -1,5 +1,5 @@
 import { connection } from "next/server";
-import { container } from "@/server/container";
+import { getWorkspaceApp } from "@/server/request-context";
 import { formatCompactMoney, formatMoney } from "@/shared/domain/money";
 import { formatPercent, ratio } from "@/shared/domain/stats";
 import { formatDate } from "@/shared/domain/time";
@@ -86,13 +86,14 @@ export async function SalesWorkspace({ searchParams }: { searchParams: Promise<S
     page: auditView && query.page > 1 ? query.page : undefined,
   };
 
-  const overview = await container.sales.overview();
+  const { app } = await getWorkspaceApp("/sales");
+  const overview = await app.sales.overview();
   const { now, kpis, counts } = overview;
   const [register, customers, lastOrder, selected] = await Promise.all([
-    container.sales.list({ ...query, page: auditView ? query.page : 1 }),
-    container.customers.list({ page: 1, pageSize: 500, sort: "company" }),
-    overview.latestReference ? container.sales.get(overview.latestReference) : Promise.resolve(null),
-    orderRef ? container.sales.get(orderRef) : Promise.resolve(null),
+    app.sales.list({ ...query, page: auditView ? query.page : 1 }),
+    app.customers.list({ page: 1, pageSize: 500, sort: "company" }),
+    overview.latestReference ? app.sales.get(overview.latestReference) : Promise.resolve(null),
+    orderRef ? app.sales.get(orderRef) : Promise.resolve(null),
   ]);
 
   const kpiTiles: SalesKpi[] = [

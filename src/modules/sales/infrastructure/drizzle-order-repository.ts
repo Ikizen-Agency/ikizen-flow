@@ -3,6 +3,7 @@ import { and, asc, count, desc, eq, gte, inArray, like, lt, lte, or, type SQL } 
 import type { Database } from "@/server/db/connect";
 import { customers, orderItems, orders } from "@/server/db/schema";
 import { OPEN_ORDER_STATUSES, ORDER_STATUSES, overdueCutoff, type EffectiveOrderStatus, type OrderStatus } from "../domain/order";
+import { NotFoundError } from "../../shared-types";
 import type { NewOrder, Order, OrderListQuery, OrderRepository, OrderStatusChange } from "../application/ports";
 
 const orderColumns = {
@@ -33,11 +34,19 @@ function effectiveStatusFilter(status: EffectiveOrderStatus, asOf: Date): SQL {
   return eq(orders.status, status);
 }
 
+/** Orders of one workspace: every query is filtered by `workspaceId`. */
 export class DrizzleOrderRepository implements OrderRepository {
-  constructor(private readonly db: Database) {}
+  constructor(
+    private readonly db: Database,
+    private readonly workspaceId: number,
+  ) {}
+
+  private inWorkspace(...filters: Array<SQL | undefined>) {
+    return and(eq(orders.workspaceId, this.workspaceId), ...filters);
+  }
 
   async list({ status, asOf = new Date(), customerId, search, issuedFrom, issuedTo, page = 1, pageSize = 20 }: OrderListQuery) {
-    const filters: SQL[] = [];
+    const filters: SQL[] = [eq(orders.workspaceId, this.workspaceId)];
     if (status) filters.push(effectiveStatusFilter(status, asOf));
     if (customerId) filters.push(eq(orders.customerId, customerId));
     if (issuedFrom) filters.push(gte(orders.issueDate, issuedFrom));
@@ -46,7 +55,7 @@ export class DrizzleOrderRepository implements OrderRepository {
       const term = `%${search.trim()}%`;
       filters.push(or(like(orders.reference, term), like(orders.invoiceNumber, term), like(customers.company, term))!);
     }
-    const where = filters.length ? and(...filters) : undefined;
+    const where = and(...filters);
 
     const items: Order[] = await this.db
       .select(orderColumns)
@@ -71,7 +80,7 @@ export class DrizzleOrderRepository implements OrderRepository {
       .select(orderColumns)
       .from(orders)
       .innerJoin(customers, eq(customers.id, orders.customerId))
-      .where(eq(orders.reference, reference));
+      .where(this.inWorkspace(eq(orders.reference, reference)));
     if (!order) return null;
     const items = await this.db
       .select({
@@ -91,7 +100,7 @@ export class DrizzleOrderRepository implements OrderRepository {
   }
 
   async countByStatus() {
-    const rows = await this.db.select({ status: orders.status, n: count() }).from(orders).groupBy(orders.status);
+    const rows = await this.db.select({ status: orders.status, n: count() }).from(orders).where(this.inWorkspace()).groupBy(orders.status);
     const result = Object.fromEntries(ORDER_STATUSES.map((s) => [s, 0])) as Record<OrderStatus, number>;
     for (const r of rows) result[r.status] = r.n;
     return result;
@@ -108,19 +117,25 @@ export class DrizzleOrderRepository implements OrderRepository {
         dueDate: orders.dueDate,
         paidAt: orders.paidAt,
       })
-      .from(orders);
+      .from(orders)
+      .where(this.inWorkspace());
   }
 
   async latestReference() {
-    const [row] = await this.db.select({ reference: orders.reference }).from(orders).orderBy(desc(orders.id)).limit(1);
+    const [row] = await this.db.select({ reference: orders.reference }).from(orders).where(this.inWorkspace()).orderBy(desc(orders.id)).limit(1);
     return row?.reference ?? null;
   }
 
   async create({ items, ...order }: NewOrder, now: Date) {
+    const [owner] = await this.db
+      .select({ id: customers.id })
+      .from(customers)
+      .where(and(eq(customers.id, order.customerId), eq(customers.workspaceId, this.workspaceId)));
+    if (!owner) throw new NotFoundError("Customer", order.customerId);
     const id = await this.db.transaction(async (tx) => {
       const [created] = await tx
         .insert(orders)
-        .values({ ...order, createdAt: now, updatedAt: now })
+        .values({ ...order, workspaceId: this.workspaceId, createdAt: now, updatedAt: now })
         .returning({ id: orders.id });
       if (items.length) {
         await tx.insert(orderItems).values(items.map((item, position) => ({ ...item, orderId: created!.id, position })));
@@ -131,11 +146,11 @@ export class DrizzleOrderRepository implements OrderRepository {
       .select(orderColumns)
       .from(orders)
       .innerJoin(customers, eq(customers.id, orders.customerId))
-      .where(eq(orders.id, id));
+      .where(this.inWorkspace(eq(orders.id, id)));
     return row!;
   }
 
   async updateStatus(id: number, change: OrderStatusChange) {
-    await this.db.update(orders).set(change).where(eq(orders.id, id));
+    await this.db.update(orders).set(change).where(this.inWorkspace(eq(orders.id, id)));
   }
 }

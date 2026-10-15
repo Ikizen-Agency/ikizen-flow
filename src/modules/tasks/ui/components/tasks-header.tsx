@@ -5,6 +5,7 @@ import { Icon } from "@/shared/ui/icon";
 import { PageHeader } from "@/shared/ui/page-header";
 
 export interface TasksHeaderProps {
+  workspaceName: string;
   active: number;
   attention: number;
   view: "kanban" | "list";
@@ -30,7 +31,7 @@ function ViewLink({ href, active, icon, label }: { href: string; active: boolean
   );
 }
 
-export function TasksHeader({ active, attention, view, kanbanHref, listHref, createHref }: TasksHeaderProps) {
+export function TasksHeader({ workspaceName, active, attention, view, kanbanHref, listHref, createHref }: TasksHeaderProps) {
   return (
     <PageHeader
       title="Tasks & Operations"
@@ -44,7 +45,7 @@ export function TasksHeader({ active, attention, view, kanbanHref, listHref, cre
           <span className="tabular">{attention}</span> Requiring Attention
         </span>
       }
-      description="Active operational sprints across Northstar Studio client accounts"
+      description={`Active operational sprints across ${workspaceName} client accounts`}
       actions={
         <>
           <nav aria-label="Board view" className="flex items-center gap-1 rounded-control bg-surface-container-low p-1">

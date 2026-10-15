@@ -34,18 +34,26 @@ function toListItem(row: { customer: typeof customers.$inferSelect; totalSalesCe
   };
 }
 
+/** Customers of one workspace: every query is filtered by `workspaceId`. */
 export class DrizzleCustomerRepository implements CustomerRepository {
-  constructor(private readonly db: Database) {}
+  constructor(
+    private readonly db: Database,
+    private readonly workspaceId: number,
+  ) {}
+
+  private inWorkspace(...filters: Array<SQL | undefined>) {
+    return and(eq(customers.workspaceId, this.workspaceId), ...filters);
+  }
 
   async list({ search, status, tier, sort = "last_active", page = 1, pageSize = 10 }: CustomerListQuery) {
-    const filters: SQL[] = [];
+    const filters: SQL[] = [eq(customers.workspaceId, this.workspaceId)];
     if (status) filters.push(eq(customers.status, status));
     if (tier) filters.push(eq(customers.tier, tier));
     if (search?.trim()) {
       const term = `%${search.trim()}%`;
       filters.push(or(like(customers.company, term), like(customers.contactName, term), like(customers.contactEmail, term))!);
     }
-    const where = filters.length ? and(...filters) : undefined;
+    const where = and(...filters);
 
     const orderBy =
       sort === "sales_desc"
@@ -77,7 +85,7 @@ export class DrizzleCustomerRepository implements CustomerRepository {
   }
 
   async findById(id: number) {
-    const row = await this.db.query.customers.findFirst({ where: eq(customers.id, id) });
+    const row = await this.db.query.customers.findFirst({ where: this.inWorkspace(eq(customers.id, id)) });
     return row ? toCustomer(row) : null;
   }
 
@@ -86,7 +94,7 @@ export class DrizzleCustomerRepository implements CustomerRepository {
       .select(summaryColumns)
       .from(customers)
       .leftJoin(orders, eq(orders.customerId, customers.id))
-      .where(eq(customers.id, id))
+      .where(this.inWorkspace(eq(customers.id, id)))
       .groupBy(customers.id);
     return row ? toListItem(row) : null;
   }
@@ -95,13 +103,13 @@ export class DrizzleCustomerRepository implements CustomerRepository {
     const [row] = await this.db
       .select()
       .from(customers)
-      .where(sql`lower(${customers.company}) = lower(${company.trim()})`)
+      .where(this.inWorkspace(sql`lower(${customers.company}) = lower(${company.trim()})`))
       .limit(1);
     return row ? toCustomer(row) : null;
   }
 
   async countCreatedSince(since: Date) {
-    const [{ total }] = await this.db.select({ total: count() }).from(customers).where(gte(customers.createdAt, since));
+    const [{ total }] = await this.db.select({ total: count() }).from(customers).where(this.inWorkspace(gte(customers.createdAt, since)));
     return total;
   }
 
@@ -109,12 +117,12 @@ export class DrizzleCustomerRepository implements CustomerRepository {
     return this.db
       .select({ id: customers.id, company: customers.company, contactEmail: customers.contactEmail })
       .from(customers)
-      .where(sql`${customers.status} != 'archived'`)
+      .where(this.inWorkspace(sql`${customers.status} != 'archived'`))
       .orderBy(asc(customers.company));
   }
 
   async countByStatus() {
-    const rows = await this.db.select({ status: customers.status, n: count() }).from(customers).groupBy(customers.status);
+    const rows = await this.db.select({ status: customers.status, n: count() }).from(customers).where(this.inWorkspace()).groupBy(customers.status);
     const result = Object.fromEntries(CUSTOMER_STATUSES.map((s) => [s, 0])) as Record<CustomerStatus, number>;
     for (const r of rows) result[r.status] = r.n;
     return result;
@@ -123,12 +131,12 @@ export class DrizzleCustomerRepository implements CustomerRepository {
   async create(input: NewCustomer, now: Date) {
     const [row] = await this.db
       .insert(customers)
-      .values({ ...input, lastActivityAt: now, createdAt: now, updatedAt: now })
+      .values({ ...input, workspaceId: this.workspaceId, lastActivityAt: now, createdAt: now, updatedAt: now })
       .returning();
     return toCustomer(row!);
   }
 
   async touch(id: number, at: Date) {
-    await this.db.update(customers).set({ lastActivityAt: at, updatedAt: at }).where(eq(customers.id, id));
+    await this.db.update(customers).set({ lastActivityAt: at, updatedAt: at }).where(this.inWorkspace(eq(customers.id, id)));
   }
 }

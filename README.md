@@ -10,26 +10,42 @@ Fullstack business operations platform built with Next.js, implementing the Stit
 | `/customers` | Customers directory: search, filters, pagination, detail panel, create customer | Server Actions, `GET /customers/export` (CSV) |
 | `/sales` | Sales orders: KPIs, status tabs, create order with line items, status transitions | Server Actions, `GET /api/orders` (JSON / CSV) |
 | `/tasks` | Tasks kanban: filters, drag and drop, list view, task detail, create task | Server Actions with optimistic updates |
+| `/login`, `/register` | Email + password sign-in; registration creates a new workspace owned by the new user | Better Auth (`/api/auth/*`) |
 
-Invoices, Reports and Settings are placeholders. There is no authentication yet: all mutations act as the seeded user "Alex Vance".
+Invoices, Reports and Settings are placeholders. Every screen, Server Action and Route Handler requires a session, and all business data is scoped to the active workspace.
 
 ## Stack
 
 - Next.js 16 (App Router, Cache Components, Server Actions, Route Handlers), React, TypeScript strict
 - Tailwind CSS v4 with design tokens from `DESIGN.md` (`src/app/globals.css`)
 - SQLite via Drizzle ORM + libSQL, Zod validation
+- Better Auth (email + password, database sessions, Drizzle adapter)
 - Vitest
 
 ## Getting started
 
 ```bash
 pnpm install
-cp .env.example .env.local   # optional, DATABASE_URL defaults to file:./data/ikizen.db
+cp .env.example .env.local   # optional in development (see Environment)
 pnpm db:reset                # migrate + seed
 pnpm dev
 ```
 
-Open http://localhost:3000.
+Open http://localhost:3000 and sign in with the demo account (shown on the login page in development):
+
+| Email | Password | Workspaces |
+| --- | --- | --- |
+| `alex@northstar.studio` | `ikizen-demo-123` | Northstar Studio (owner, full design dataset), Helix Labs Sandbox (owner, small dataset) |
+
+Switch workspaces from the workspace card at the top of the sidebar. Upgrading a database created before workspaces existed requires `pnpm db:reset` (the migration adds required `workspace_id` columns).
+
+## Environment
+
+| Variable | Default | Notes |
+| --- | --- | --- |
+| `DATABASE_URL` | `file:./data/ikizen.db` | libSQL URL |
+| `BETTER_AUTH_SECRET` | development-only secret | Required in production (`next start`): at least 32 characters, e.g. `openssl rand -base64 32`. The server refuses to start without it. |
+| `BETTER_AUTH_URL` | `http://localhost:3000` | Public origin of the app (set it when serving on another host or port). |
 
 ## Scripts
 
@@ -51,13 +67,16 @@ Screaming, hexagonal-lite structure organized by feature:
 ```
 src/
   app/                       # thin routes (containers): pages, layouts, route handlers
-  modules/<feature>/         # customers, sales, tasks, dashboard, activity, team
+  proxy.ts                   # optimistic auth redirect (Next 16 Proxy, formerly Middleware)
+  modules/<feature>/         # auth, workspaces, customers, sales, tasks, dashboard, activity, team
     domain/                  # types and pure business rules (tested)
     application/             # ports (repository interfaces) and use cases
     infrastructure/          # Drizzle repositories implementing the ports
     ui/                      # Server Actions and presentational components
   server/
-    container.ts             # composition root wiring repositories into use cases
+    auth.ts                  # Better Auth instance (Drizzle adapter, sign-up hook)
+    container.ts             # composition root: forWorkspace(id) wires scoped repositories into use cases
+    request-context.ts       # session -> { user, workspace, role, member } per request
     db/                      # schema, client, seed
   shared/
     ui/                      # design-system primitives (Button, Badge, Card, ...)
@@ -67,6 +86,20 @@ src/
 
 Conventions:
 
-- Only `src/server/container.ts` imports the database client; pages and actions call `container`.
+- Only `src/server/container.ts` and `src/server/auth.ts` import the database client.
+- Pages, Server Actions and Route Handlers never pick a workspace themselves; they get it from the session (see Authentication and workspaces).
 - Money is stored as integer cents. "Overdue" is derived from due dates, never stored.
 - With Cache Components enabled, request-time data (DB reads, `searchParams`, `new Date()`) lives in async children wrapped in `<Suspense>` after `await connection()`.
+
+## Authentication and workspaces
+
+- **Better Auth** (`src/server/auth.ts`) handles email + password with database sessions (`user`, `session`, `account`, `verification` tables in the Drizzle schema). Endpoints are mounted at `/api/auth/[...all]`; the `nextCookies` plugin lets Server Actions set the session cookie. `src/modules/auth/ui/auth-client.ts` exports a browser client for client-side session hooks.
+- **Workspaces**: `workspaces` + `workspace_memberships` (`owner` / `admin` / `member`). `members` are per-workspace people with an optional `user_id` (teammates without a login are allowed). Customers, orders, tasks, activity events and members carry `workspace_id`; order items and subtasks are reached through their parent. Company names, order references, invoice numbers and task codes are unique per workspace.
+- **Registration**: every sign-up (the `/register` form or `POST /api/auth/sign-up/email`) runs a Better Auth `user.create.after` hook that provisions a new workspace (optional `workspaceName` body field) with the user as owner.
+- **Request context** (`src/server/request-context.ts`, server-only, memoised per request):
+  - `getRequestContext()` returns `{ user, workspace, role, member, memberships }` or `null`. The active workspace comes from the `ikizen_workspace` cookie only when the user is a member of it, otherwise the first workspace.
+  - Pages / Server Components: `const { ctx, app } = await getWorkspaceApp("/current-path")` (redirects to `/login?next=...` when signed out). `app` holds the use cases bound to `ctx.workspace.id`; pass `ctx.member.id` as the actor of mutations.
+  - Server Actions: `const { ctx, app } = await getWorkspaceApp()` as the first statement.
+  - Route Handlers: `const auth = await authorizeRoute(); if (auth instanceof Response) return auth;` (401 JSON when signed out).
+  - `switchWorkspaceAction` and `listMyWorkspaces()` (`src/modules/workspaces/ui/`) power the workspace switcher; `signOutAction` ends the session.
+- **Route protection**: `src/proxy.ts` only checks that a session cookie exists (redirects pages to `/login?next=...`, returns 401 for `/api/*`). It is an optimisation; the real check is the database session lookup in the request context.

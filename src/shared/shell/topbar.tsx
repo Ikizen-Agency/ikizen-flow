@@ -1,8 +1,8 @@
-import { Avatar } from "@/shared/ui/avatar";
+import { Suspense } from "react";
 import { Icon } from "@/shared/ui/icon";
 import { CreateNewMenu } from "./create-new-menu";
 import { Logo } from "./logo";
-import { CURRENT_USER, WORKSPACE } from "./navigation";
+import { TopbarUser, WorkspaceBreadcrumb } from "./session-widgets";
 
 export function Topbar() {
   return (
@@ -15,7 +15,9 @@ export function Topbar() {
           <nav aria-label="Breadcrumb" className="hidden items-center gap-space-sm sm:flex">
             <span className="text-label-md text-ink-subtle">Workspace</span>
             <span className="text-body-sm text-outline">/</span>
-            <span className="truncate text-headline-sm text-ink">{WORKSPACE.breadcrumb}</span>
+            <Suspense fallback={<span className="h-5 w-32 animate-pulse rounded-sm bg-surface-container-low" aria-hidden />}>
+              <WorkspaceBreadcrumb />
+            </Suspense>
           </nav>
         </div>
         <div className="hidden max-w-md flex-1 md:block">
@@ -41,7 +43,9 @@ export function Topbar() {
             <span className="sr-only">You have unread notifications</span>
           </button>
           <CreateNewMenu />
-          <Avatar name={CURRENT_USER.name} />
+          <Suspense fallback={<span className="size-8 animate-pulse rounded-full bg-surface-container-low" aria-hidden />}>
+            <TopbarUser />
+          </Suspense>
         </div>
       </div>
     </header>

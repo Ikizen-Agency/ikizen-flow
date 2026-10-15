@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
+import { signOutAction } from "@/modules/auth/ui/actions";
 import { cn } from "@/shared/lib/cn";
 import { Icon } from "@/shared/ui/icon";
 import { isActive, NAV_ITEMS } from "./navigation";
@@ -87,6 +88,17 @@ export function MobileNav() {
                   </li>
                 );
               })}
+              <li>
+                <form action={signOutAction}>
+                  <button
+                    type="submit"
+                    className="flex w-full items-center gap-space-sm rounded-control px-space-sm py-space-sm text-label-md text-ink-muted hover:bg-well hover:text-danger"
+                  >
+                    <Icon name="logout" size={20} />
+                    Log out
+                  </button>
+                </form>
+              </li>
             </ul>
           </div>
         </div>

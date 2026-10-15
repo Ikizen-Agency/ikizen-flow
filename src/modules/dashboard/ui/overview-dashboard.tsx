@@ -1,5 +1,5 @@
 import { connection } from "next/server";
-import { container } from "@/server/container";
+import { getWorkspaceApp } from "@/server/request-context";
 import { formatMoney } from "@/shared/domain/money";
 import { formatPercent } from "@/shared/domain/stats";
 import { formatDate, formatRelativeTime } from "@/shared/domain/time";
@@ -47,9 +47,10 @@ const clock = new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-dig
 export async function OverviewDashboard({ searchParams }: { searchParams: Promise<SearchParamsRecord> }) {
   await connection();
   const query = parseDashboardParams(await searchParams);
-  const [view, member] = await Promise.all([container.dashboard.overview(query), container.team.currentMember()]);
+  const { ctx, app } = await getWorkspaceApp("/");
+  const view = await app.dashboard.overview(query);
   const { now } = view;
-  const firstName = member?.name.split(" ")[0] ?? "there";
+  const firstName = ctx.member.name.split(" ")[0] || "there";
   const urlState = { period: query.period === "month" ? undefined : query.period, metric: query.metric === "gross" ? undefined : query.metric };
 
   const peak = view.trend.points[view.trend.peakIndex];
@@ -60,7 +61,7 @@ export async function OverviewDashboard({ searchParams }: { searchParams: Promis
       <PageHeader
         eyebrow="Executive Cockpit"
         title={`${greetingFor(now)}, ${firstName}.`}
-        description="Here is what's happening across Northstar Studio today."
+        description={`Here is what's happening across ${ctx.workspace.name} today.`}
         actions={
           <>
             <PeriodPicker

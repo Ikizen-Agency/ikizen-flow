@@ -16,17 +16,6 @@ export const NAV_ITEMS: ReadonlyArray<NavItem> = [
   { href: "/settings", label: "Settings", icon: "settings", primaryOnMobile: false },
 ];
 
-export const WORKSPACE = {
-  name: "Northstar Studio",
-  unit: "Digital Operations",
-  breadcrumb: "Northstar Operations",
-} as const;
-
-export const CURRENT_USER = {
-  name: "Alex Vance",
-  role: "Operations Manager",
-} as const;
-
 /** True when `pathname` is the item route or one of its children. */
 export function isActive(pathname: string, href: string): boolean {
   if (href === "/") return pathname === "/";

@@ -1,5 +1,5 @@
 import { connection } from "next/server";
-import { container } from "@/server/container";
+import { getWorkspaceApp } from "@/server/request-context";
 import { formatPercent } from "@/shared/domain/stats";
 import { formatRelativeTime } from "@/shared/domain/time";
 import { hrefWith } from "@/shared/ui/href";
@@ -31,20 +31,21 @@ const milestoneDate = new Intl.DateTimeFormat("en-US", { month: "short", day: "n
 export async function TasksWorkspace({ searchParams }: { searchParams: Promise<SearchParamsRecord> }) {
   await connection();
   const params = parseTaskBoardParams(await searchParams);
-  const now = container.clock();
+  const { ctx, app } = await getWorkspaceApp("/tasks");
+  const now = app.clock();
   const filters = taskFilterQuery(params);
 
   const [all, board, members, customers, detail] = await Promise.all([
-    container.repositories.tasks.listBoard({}),
-    container.tasks.board({
+    app.repositories.tasks.listBoard({}),
+    app.tasks.board({
       assigneeId: params.assigneeId,
       priority: params.priority,
       customerId: params.client,
       ...dueWindow(params.due, now),
     }),
-    container.team.members(),
-    container.repositories.customers.listOptions(),
-    params.taskId ? container.tasks.detail(params.taskId) : Promise.resolve(null),
+    app.team.members(),
+    app.repositories.customers.listOptions(),
+    params.taskId ? app.tasks.detail(params.taskId) : Promise.resolve(null),
   ]);
 
   const toCard = (t: Task): TaskCardModel => ({
@@ -86,6 +87,7 @@ export async function TasksWorkspace({ searchParams }: { searchParams: Promise<S
   return (
     <div className="flex flex-col gap-space-lg">
       <TasksHeader
+        workspaceName={ctx.workspace.name}
         active={summary.active}
         attention={summary.attention}
         view={params.view}

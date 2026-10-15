@@ -1,6 +1,7 @@
 import type { Member } from "../domain/member";
 
+/** Members of one workspace (the adapter is constructed for a workspace). */
 export interface MemberRepository {
   list(): Promise<Member[]>;
-  findByName(name: string): Promise<Member | null>;
+  findById(id: number): Promise<Member | null>;
 }

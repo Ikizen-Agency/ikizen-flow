@@ -1,10 +1,14 @@
 import "server-only";
+import { eq } from "drizzle-orm";
 import type { Database } from "@/server/db/connect";
 import { orders } from "@/server/db/schema";
 import type { DashboardRepository } from "../application/ports";
 
 export class DrizzleDashboardRepository implements DashboardRepository {
-  constructor(private readonly db: Database) {}
+  constructor(
+    private readonly db: Database,
+    private readonly workspaceId: number,
+  ) {}
 
   orderFacts() {
     return this.db
@@ -18,6 +22,7 @@ export class DrizzleDashboardRepository implements DashboardRepository {
         dueDate: orders.dueDate,
         paidAt: orders.paidAt,
       })
-      .from(orders);
+      .from(orders)
+      .where(eq(orders.workspaceId, this.workspaceId));
   }
 }

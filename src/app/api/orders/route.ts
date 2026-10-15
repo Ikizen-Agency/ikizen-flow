@@ -1,19 +1,23 @@
 import { connection, type NextRequest } from "next/server";
-import { container } from "@/server/container";
+import { authorizeRoute } from "@/server/request-context";
 import { toCsv } from "@/shared/domain/csv";
 import { parseOrderListParams } from "@/modules/sales/application/list-params";
 import { effectiveOrderStatus, ORDER_STATUS_LABELS } from "@/modules/sales/domain/order";
 
 /**
  * GET /api/orders: paginated order list as JSON (or CSV with `format=csv`).
+ * Requires a session (401 otherwise); results are limited to the active workspace.
  * Query: status (incl. derived "overdue"), q, customerId, page, pageSize (max 100).
  */
 export async function GET(request: NextRequest) {
   await connection();
+  const auth = await authorizeRoute();
+  if (auth instanceof Response) return auth;
+  const { app } = auth;
   const params = Object.fromEntries(request.nextUrl.searchParams);
   const query = parseOrderListParams(params, { pageSize: 20, allowPageSize: true });
-  const page = await container.sales.list(query);
-  const now = container.clock();
+  const page = await app.sales.list(query);
+  const now = app.clock();
   const items = page.items.map((o) => ({
     reference: o.reference,
     customer: { id: o.customerId, company: o.customerCompany },

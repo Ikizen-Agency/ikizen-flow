@@ -16,14 +16,16 @@ import { DrizzleCustomerRepository } from "./drizzle-customer-repository";
 const now = new Date("2026-10-14T12:00:00Z");
 let db: Database;
 let cleanup: () => void;
+/** Northstar Studio, the workspace holding the design dataset. */
+let ws: number;
 
 beforeAll(async () => {
   ({ db, cleanup } = await createTestDatabase());
-  await seedDatabase(db, now);
+  ws = (await seedDatabase(db, now)).workspaces.northstar;
 });
 afterAll(() => cleanup());
 
-const deps = () => ({ customers: new DrizzleCustomerRepository(db), activity: new DrizzleActivityRepository(db), clock: () => now });
+const deps = () => ({ customers: new DrizzleCustomerRepository(db, ws), activity: new DrizzleActivityRepository(db, ws), clock: () => now });
 
 describe("customer directory queries", () => {
   it("returns a single customer with sales aggregates", async () => {
@@ -64,7 +66,7 @@ describe("customer directory queries", () => {
 
 describe("directory stats and profile", () => {
   it("aggregates header KPIs from customers and orders", async () => {
-    const stats = await makeGetCustomerDirectoryStats({ ...deps(), orders: new DrizzleOrderRepository(db) })();
+    const stats = await makeGetCustomerDirectoryStats({ ...deps(), orders: new DrizzleOrderRepository(db, ws) })();
     expect(stats.totalAccounts).toBeGreaterThanOrEqual(14);
     expect(stats.pipelineCents).toBeGreaterThan(0);
     expect(stats.retention).toBeGreaterThan(0);
@@ -73,7 +75,7 @@ describe("directory stats and profile", () => {
 
   it("builds a customer profile with open deals, health and recent orders", async () => {
     const apex = (await deps().customers.list({ search: "Apex" })).items[0]!;
-    const profile = await makeGetCustomerProfile({ ...deps(), orders: new DrizzleOrderRepository(db) })(apex.id);
+    const profile = await makeGetCustomerProfile({ ...deps(), orders: new DrizzleOrderRepository(db, ws) })(apex.id);
     expect(profile?.customer.company).toBe("Apex Digital Labs");
     expect(profile?.recentOrders.length).toBeGreaterThan(0);
     expect(profile?.healthScore).toBeGreaterThanOrEqual(0);

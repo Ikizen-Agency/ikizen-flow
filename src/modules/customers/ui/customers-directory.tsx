@@ -1,5 +1,5 @@
 import { connection } from "next/server";
-import { container } from "@/server/container";
+import { getWorkspaceApp } from "@/server/request-context";
 import type { BadgeTone } from "@/shared/ui/badge";
 import { hrefWith } from "@/shared/ui/href";
 import { Pagination } from "@/shared/ui/pagination";
@@ -42,8 +42,9 @@ const ORDER_EVENT: Record<EffectiveOrderStatus, { icon: string; tone: BadgeTone 
 export async function CustomersDirectory({ searchParams }: { searchParams: Promise<SearchParamsRecord> }) {
   await connection();
   const params = await searchParams;
+  const { ctx, app } = await getWorkspaceApp("/customers");
   const query = parseCustomerListParams(params);
-  const now = container.clock();
+  const now = app.clock();
 
   const filters = {
     q: query.search,
@@ -56,9 +57,9 @@ export async function CustomersDirectory({ searchParams }: { searchParams: Promi
   const creating = firstParam(params.create) === "1";
 
   const [page, stats, profile] = await Promise.all([
-    container.customers.list(query),
-    container.customers.stats(),
-    Number.isInteger(customerId) && customerId > 0 ? container.customers.profile(customerId) : Promise.resolve(null),
+    app.customers.list(query),
+    app.customers.stats(),
+    Number.isInteger(customerId) && customerId > 0 ? app.customers.profile(customerId) : Promise.resolve(null),
   ]);
 
   const rows = page.items.map((c) => ({
@@ -79,6 +80,7 @@ export async function CustomersDirectory({ searchParams }: { searchParams: Promi
   return (
     <div className="flex flex-col gap-space-lg">
       <CustomersHeader
+        workspaceName={ctx.workspace.name}
         totalAccounts={stats.totalAccounts}
         newThisQuarter={stats.newThisQuarter}
         pipeline={formatMoney(stats.pipelineCents, { decimals: false })}

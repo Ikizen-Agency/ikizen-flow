@@ -1,9 +1,10 @@
 import Link from "next/link";
-import { Avatar } from "@/shared/ui/avatar";
+import { Suspense } from "react";
 import { Icon } from "@/shared/ui/icon";
 import { Logo } from "./logo";
 import { SidebarNavLink } from "./nav-link";
-import { CURRENT_USER, NAV_ITEMS, WORKSPACE } from "./navigation";
+import { NAV_ITEMS } from "./navigation";
+import { SidebarUserCard, SidebarUserCardSkeleton, WorkspaceSwitcher, WorkspaceSwitcherSkeleton } from "./session-widgets";
 
 /**
  * Fixed workspace navigation.
@@ -18,16 +19,9 @@ export function Sidebar() {
             <Logo />
             <span className="hidden text-headline-sm text-ink lg:inline">Ikizen Flow</span>
           </Link>
-          <button
-            type="button"
-            className="hidden w-full items-center justify-between rounded-control bg-surface-container-low p-space-sm text-left transition-colors hover:bg-surface-container lg:flex"
-          >
-            <span className="flex min-w-0 flex-col pr-space-xs">
-              <span className="truncate text-label-md text-ink">{WORKSPACE.name}</span>
-              <span className="truncate text-body-sm text-ink-subtle">{WORKSPACE.unit}</span>
-            </span>
-            <Icon name="unfold_more" size={18} className="text-outline" />
-          </button>
+          <Suspense fallback={<WorkspaceSwitcherSkeleton />}>
+            <WorkspaceSwitcher />
+          </Suspense>
         </div>
         <nav aria-label="Primary" className="flex-1 space-y-space-xs overflow-y-auto px-space-md py-space-xs">
           {NAV_ITEMS.map((item) => (
@@ -46,23 +40,9 @@ export function Sidebar() {
           <Icon name="help_outline" size={18} />
           <span className="hidden lg:inline">Documentation &amp; Support</span>
         </a>
-        <div className="flex items-center justify-center rounded-control bg-surface-container-low p-space-sm lg:justify-between">
-          <div className="flex min-w-0 items-center gap-space-sm">
-            <Avatar name={CURRENT_USER.name} />
-            <div className="hidden min-w-0 flex-col lg:flex">
-              <span className="truncate text-label-md text-ink">{CURRENT_USER.name}</span>
-              <span className="truncate text-body-sm text-ink-subtle">{CURRENT_USER.role}</span>
-            </div>
-          </div>
-          <div className="hidden items-center gap-space-xs lg:flex">
-            <button type="button" title="Switch workspace" className="rounded-sm p-space-xs text-outline transition-colors hover:text-ink">
-              <Icon name="swap_horiz" size={18} />
-            </button>
-            <button type="button" title="Log out" className="rounded-sm p-space-xs text-outline transition-colors hover:text-danger">
-              <Icon name="logout" size={18} />
-            </button>
-          </div>
-        </div>
+        <Suspense fallback={<SidebarUserCardSkeleton />}>
+          <SidebarUserCard />
+        </Suspense>
       </div>
     </aside>
   );

@@ -9,18 +9,20 @@ import { DrizzleTaskRepository } from "./drizzle-task-repository";
 const now = new Date("2026-10-14T12:00:00Z");
 let db: Database;
 let cleanup: () => void;
+/** Northstar Studio, the workspace holding the design dataset. */
+let ws: number;
 
 beforeAll(async () => {
   ({ db, cleanup } = await createTestDatabase());
-  await seedDatabase(db, now);
+  ws = (await seedDatabase(db, now)).workspaces.northstar;
 });
 afterAll(() => cleanup());
 
-const deps = () => ({ tasks: new DrizzleTaskRepository(db), activity: new DrizzleActivityRepository(db), clock: () => now });
+const deps = () => ({ tasks: new DrizzleTaskRepository(db, ws), activity: new DrizzleActivityRepository(db, ws), clock: () => now });
 
 describe("task board storage", () => {
   it("filters open tasks by due window", async () => {
-    const repo = new DrizzleTaskRepository(db);
+    const repo = new DrizzleTaskRepository(db, ws);
     const all = await repo.listBoard({});
     const open = await repo.listBoard({ openOnly: true, dueBefore: now });
     expect(open.length).toBeGreaterThan(0);
@@ -32,7 +34,7 @@ describe("task board storage", () => {
 
 describe("task detail use cases", () => {
   it("toggles and adds subtasks on the right task only", async () => {
-    const repo = new DrizzleTaskRepository(db);
+    const repo = new DrizzleTaskRepository(db, ws);
     const [withSubtasks] = (await repo.listBoard({})).filter((t) => t.subtasks.length > 0);
     const target = withSubtasks!.subtasks.find((s) => !s.done)!;
 
@@ -47,7 +49,7 @@ describe("task detail use cases", () => {
   });
 
   it("records comments and moves in the task timeline", async () => {
-    const repo = new DrizzleTaskRepository(db);
+    const repo = new DrizzleTaskRepository(db, ws);
     const [first] = await repo.listBoard({ priority: "low" });
     await makeCommentOnTask(deps())(first!.id, "Kickoff scheduled", 1);
     await makeMoveTask(deps())(first!.id, "in_progress");

@@ -6,6 +6,7 @@ import { KpiTile } from "@/shared/ui/kpi-tile";
 import { BulkActionsMenu } from "./bulk-actions-menu";
 
 export interface CustomersHeaderProps {
+  workspaceName: string;
   totalAccounts: number;
   newThisQuarter: number;
   pipeline: string;
@@ -17,6 +18,7 @@ export interface CustomersHeaderProps {
 }
 
 export function CustomersHeader({
+  workspaceName,
   totalAccounts,
   newThisQuarter,
   pipeline,
@@ -39,7 +41,7 @@ export function CustomersHeader({
             ) : null}
           </div>
           <p className="max-w-2xl text-body-md text-ink-muted">
-            Manage client relationships, billing terms, active contracts, and engagement history across Northstar Studio
+            Manage client relationships, billing terms, active contracts, and engagement history across {workspaceName}
             operations.
           </p>
         </div>

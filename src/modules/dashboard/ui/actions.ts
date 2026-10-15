@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { container } from "@/server/container";
+import { getWorkspaceApp } from "@/server/request-context";
 import { NotFoundError } from "../../shared-types";
 import { ReminderNotAllowedError } from "../application/use-cases";
 
@@ -15,11 +15,11 @@ const reminderSchema = z.object({ reference: z.string().trim().regex(/^SL-\d+$/)
 
 /** "Send Reminder" on an overdue receivable: records a billing activity (no email is sent). */
 export async function sendReminderAction(_prev: ReminderState, formData: FormData): Promise<ReminderState> {
+  const { ctx, app } = await getWorkspaceApp();
   const parsed = reminderSchema.safeParse({ reference: formData.get("reference") });
   if (!parsed.success) return { status: "error", message: "Unknown invoice." };
   try {
-    const actor = await container.team.currentMember();
-    const { company } = await container.dashboard.sendReminder(parsed.data.reference, actor?.id ?? null);
+    const { company } = await app.dashboard.sendReminder(parsed.data.reference, ctx.member.id);
     revalidatePath("/");
     return { status: "sent", message: `Reminder logged for ${company}.` };
   } catch (error) {

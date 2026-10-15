@@ -13,19 +13,21 @@ import { seedDatabase } from "./seed/seed";
 const now = new Date("2026-10-14T12:00:00Z");
 let db: Database;
 let cleanup: () => void;
+/** Northstar Studio, the workspace holding the design dataset. */
+let ws: number;
 
 beforeAll(async () => {
   ({ db, cleanup } = await createTestDatabase());
-  await seedDatabase(db, now);
+  ws = (await seedDatabase(db, now)).workspaces.northstar;
 });
 afterAll(() => cleanup());
 
 function deps() {
   return {
-    customers: new DrizzleCustomerRepository(db),
-    orders: new DrizzleOrderRepository(db),
-    tasks: new DrizzleTaskRepository(db),
-    activity: new DrizzleActivityRepository(db),
+    customers: new DrizzleCustomerRepository(db, ws),
+    orders: new DrizzleOrderRepository(db, ws),
+    tasks: new DrizzleTaskRepository(db, ws),
+    activity: new DrizzleActivityRepository(db, ws),
     clock: () => now,
   };
 }

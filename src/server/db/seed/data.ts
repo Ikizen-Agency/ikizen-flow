@@ -183,3 +183,53 @@ export const ACTIVITY: ActivityFixture[] = [
   { actor: "Marcus Miller", message: "moved Orbit Commerce to proposal stage", category: "pipeline", minutesAgo: 60 * 50 },
   { actor: "Mira Torres", message: "published design token update v2.4", category: "operations", minutesAgo: 60 * 76 },
 ];
+
+/** Demo login (development only). Alex owns both seeded workspaces. */
+export const DEMO_USER = {
+  name: "Alex Vance",
+  email: "alex@northstar.studio",
+  password: "ikizen-demo-123",
+} as const;
+
+export const NORTHSTAR_WORKSPACE = { name: "Northstar Studio", slug: "northstar-studio", tagline: "Digital Operations" } as const;
+
+/** Second, small workspace so the workspace switcher has real data to switch to. */
+export interface SandboxFixture {
+  name: string;
+  slug: string;
+  tagline: string;
+  members: Array<{ name: string; email: string; role: string }>;
+  customers: Array<Omit<CustomerFixture, "historyWeight" | "categories">>;
+  orders: OrderFixture[];
+  tasks: Array<Omit<TaskFixture, "assignee"> & { assignee: string | null }>;
+  activity: Array<Omit<ActivityFixture, "actor"> & { actor: string }>;
+}
+
+export const SANDBOX_WORKSPACE: SandboxFixture = {
+  name: "Helix Labs Sandbox",
+  slug: "helix-labs-sandbox",
+  tagline: "R&D Experiments",
+  members: [
+    { name: "Alex Vance", email: "alex@northstar.studio", role: "Lab Director" },
+    { name: "Noah Patel", email: "noah@helixlabs.dev", role: "Research Engineer" },
+  ],
+  customers: [
+    { company: "Quanta Bioworks", tier: "project", status: "active", industry: "Biotech", contactName: "Iris Novak", contactEmail: "iris@quantabio.com", lastActiveHoursAgo: 6 },
+    { company: "Polaris Mobility", tier: "retainer", status: "active", industry: "Automotive", contactName: "Theo Lindgren", contactEmail: "theo@polarismobility.eu", lastActiveHoursAgo: 30 },
+    { company: "Kite Learning", tier: "project", status: "pending_review", industry: "Education", contactName: "Amara Diallo", contactEmail: "amara@kitelearning.org", lastActiveHoursAgo: 24 * 4 },
+  ],
+  orders: [
+    { customer: "Quanta Bioworks", title: "Lab Data Platform Prototype", category: "custom_software", status: "completed", amountCents: 640000, issuedDaysAgo: 48, invoiceNumber: "INV-1900" },
+    { customer: "Polaris Mobility", title: "Fleet Telemetry Architecture Review", category: "cloud_architecture", status: "invoiced", amountCents: 380000, issuedDaysAgo: 12, invoiceNumber: "INV-1901" },
+    { customer: "Kite Learning", title: "Learner Dashboard UX Sprint", category: "ux_ui_retainer", status: "pending", amountCents: 210000, issuedDaysAgo: 3 },
+  ],
+  tasks: [
+    { code: "TASK-101", title: "Benchmark sequencing ingestion pipeline", status: "in_progress", priority: "high", customer: "Quanta Bioworks", assignee: "Noah Patel", due: [2, 17, 0], tags: ["Research"] },
+    { code: "TASK-102", title: "Draft telemetry review findings", status: "todo", priority: "medium", customer: "Polaris Mobility", assignee: "Alex Vance", due: [5, 12, 0], tags: ["Architecture"] },
+    { code: "TASK-103", title: "Set up sandbox CI runners", status: "completed", priority: "low", customer: null, assignee: "Noah Patel", due: [-3, 17, 0], completedDaysAgo: 3, tags: ["Infrastructure"] },
+  ],
+  activity: [
+    { actor: "Noah Patel", message: "started benchmark runs for Quanta Bioworks", category: "development", minutesAgo: 45 },
+    { actor: "Alex Vance", message: "invoiced Polaris Mobility for the telemetry review", category: "billing", minutesAgo: 60 * 26 },
+  ],
+};
