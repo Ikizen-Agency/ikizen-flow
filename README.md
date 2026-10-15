@@ -1,66 +1,207 @@
 # Ikizen Flow
 
-Fullstack business operations platform built with Next.js, implementing the Stitch "Ikizen Flow" design (`design/stitch_ikizen_flow_business_platform/`).
+**The operations cockpit for service studios: customers, sales, invoices, tasks and reports in one multi-tenant workspace.**
 
-## Features
+![Next.js 16](https://img.shields.io/badge/Next.js-16-000000?logo=nextdotjs)
+![TypeScript strict](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)
+![Tailwind CSS v4](https://img.shields.io/badge/Tailwind_CSS-v4-06B6D4?logo=tailwindcss&logoColor=white)
+![SQLite + Drizzle](https://img.shields.io/badge/SQLite-Drizzle_ORM-003B57?logo=sqlite&logoColor=white)
+![Tests: 436 passing](https://img.shields.io/badge/tests-436_passing-2EA44F?logo=vitest&logoColor=white)
 
-| Route | Screen | Backend |
-| --- | --- | --- |
-| `/` | Overview dashboard: KPIs, revenue trend, revenue by category, critical tasks, recent sales, team activity, overdue receivables; Filters popover (`?category=`, `?customer=`, `?assignee=`: category and customer narrow the revenue, sales and receivables widgets, customer and assignee narrow the task widgets) with removable chips; Send Reminder emails the customer and shows the outbox status; Live Sync re-renders every 30 s while the tab is visible ("Updated Xs ago", paused when hidden) | DB aggregates, complete task / send reminder actions |
-| `/activity` | Full team activity log: category, member and record-type filters (`?category=`, `?member=`, `?entity=customer\|order\|task`), pagination, links to the records | Server-side paginated query |
-| `/customers` | Customers directory: search, filters, pagination, detail panel, create / edit customer, status and tier changes, archive / unarchive (`?status=archived`), delete (only without orders or tasks), row "More actions" menu, bulk actions on selected rows (Send Campaign email, Apply Tier Tag, Archive, Delete) | Server Actions, `GET /customers/export` (CSV) |
-| `/sales` | Sales orders: KPIs, status tabs, create order with line items, status transitions, edit drafts / pending orders in the composer (`?edit=SL-xxxx`), delete unpaid drafts / cancelled orders, payments (partial payments up to the balance, history, delete; fully paid orders complete automatically), paid / balance indicator in the register | Server Actions, `GET /api/orders` (JSON / CSV, with `paidCents` / `balanceCents`) |
-| `/tasks` | Tasks kanban: server-side text search (`?q=`, title / code / description) with assignee, priority, client and due filters, drag and drop (moving to Blocked asks for a required reason), list view, task detail, create / edit (`?edit=<id>`, reassignment notifies the new assignee) / duplicate / delete tasks, editable blocked reason, checklist (toggle, add, rename, delete), comments (edit / delete your own) with `@` member autocomplete; mentions notify the mentioned teammates, attachments (upload, download, delete), time tracking ("Log time", entries, tracked vs estimate) | Server Actions with optimistic updates, `GET /api/attachments/<id>` (download) |
-| `/invoices` | Invoices: KPI tiles (outstanding, overdue, collected this month, average days to pay), All / Open / Overdue / Paid tabs, search (invoice #, order, client), client and issue-date filters, pagination, row actions; `/invoices/<number>` printable invoice (workspace as issuer, bill-to, line items, totals, payments, balance, terms) with Print / Save as PDF, Send invoice, Send reminder (unpaid only), Mark as paid and Record payment; Issue an Invoice from pending / processing orders | Server Actions (outbox emails, sales payment lifecycle), `GET /invoices/export` (CSV of the filtered list) |
-| `/reports` | Reports for a date range (presets: this month, last month, this quarter, year to date, last 12 months, or custom from / to): revenue over time (billed vs collected chart + table), revenue by category, top customers, sales pipeline by status, accounts receivable aging (current, 1-30, 31-60, 61-90, 90+ days), task throughput (created vs completed per week, by assignee, cycle time, overdue), team time logged | `GET /reports/export?section=<revenue\|categories\|customers\|pipeline\|aging\|tasks\|assignees\|time>&preset=…` (CSV per section) |
-| `/settings` | Tabs (`?tab=`): **Workspace** (name, tagline, URL slug; owners / admins edit, members read; owner-only danger zone deletes the workspace after typing its name, never the user's last one), **Members** (roster with login / access level, invite by email, add a teammate without a login, change access level, remove, revoke pending invitations), **Profile** (name, job title, avatar colour, change password with optional sign-out of other sessions), **Notifications** (in-app / email per notification type), **Email** (owners / admins: transport and sender, send a test email, outbox with kind / status filters, pagination, message detail and Retry for failed deliveries) | Server Actions; rules enforced in use cases |
-| `/invite/<token>` | Accept a workspace invitation (signed-out visitors sign in or register and come back) | Server Action |
-| `/help` | Help Center: getting started, keyboard shortcuts, module guides, FAQ, contact support form | Server Action emails `SUPPORT_EMAIL` through the outbox |
-| Shell | ⌘K / Ctrl+K command palette (customers, orders, tasks, quick actions, navigation), notifications bell (unread first, mark read / all read), per-route breadcrumb, account menu, workspace switcher + create workspace | `GET /api/search?q=` (JSON, grouped, workspace-scoped), Server Actions |
-| `/login`, `/register` | Email + password sign-in; registration creates a new workspace owned by the new user | Better Auth (`/api/auth/*`) |
+![Ikizen Flow dashboard](docs/screenshots/dashboard.jpg)
 
-Every screen, Server Action and Route Handler requires a session, and all business data is scoped to the active workspace.
+Ikizen Flow is a fullstack Next.js app built by [Ikizen Agency](https://github.com/Ikizen-Agency) as a portfolio project. It runs the day-to-day of a digital studio: who the clients are, what was sold, what is still owed, and who is working on what. Every screen reads real data from a database, every action goes through a validated use case, and every record belongs to a workspace.
 
-## Stack
+**Try it in 3 commands** (see [Getting started](#getting-started)):
 
-- Next.js 16 (App Router, Cache Components, Server Actions, Route Handlers), React, TypeScript strict
-- Tailwind CSS v4 with design tokens from `DESIGN.md` (`src/app/globals.css`)
-- SQLite via Drizzle ORM + libSQL, Zod validation
-- Better Auth (email + password, database sessions, Drizzle adapter)
-- Vitest
+```bash
+pnpm install && pnpm db:reset && pnpm dev
+```
+
+Then sign in with the demo account:
+
+| Email | Password |
+| --- | --- |
+| `alex@northstar.studio` | `ikizen-demo-123` |
+
+---
+
+## Contents
+
+- [What it does](#what-it-does)
+- [Tech stack](#tech-stack)
+- [Architecture](#architecture)
+- [Quality](#quality)
+- [Getting started](#getting-started)
+- [Deployment](#deployment)
+- [Reference](#reference): environment, scripts, project structure, domain notes
+- [Known limitations](#known-limitations)
+- [Credits and license](#credits-and-license)
+
+---
+
+## What it does
+
+| Module | Highlights |
+| --- | --- |
+| **Overview** `/` | KPIs, revenue trend chart, revenue by category, critical tasks, overdue receivables with one-click email reminders, filters, live refresh every 30 s |
+| **Customers** `/customers` | Searchable directory, profile drawer, create / edit / archive / delete, tiers, bulk actions (email campaign, tag, archive), CSV export |
+| **Sales** `/sales` | Order composer with line items and live totals, status lifecycle, partial payments with balances, auto-completion when fully paid, JSON / CSV API |
+| **Tasks** `/tasks` | Kanban with drag and drop (plus an accessible "Move to" select), list view, checklists, `@mention` comments, attachments, time tracking |
+| **Invoices** `/invoices` | Open / overdue / paid tabs, printable invoice page (Save as PDF), send invoice, reminders, record payment |
+| **Reports** `/reports` | Date-range presets, billed vs collected revenue, top customers, pipeline, receivables aging, task throughput, time logged, CSV per section |
+| **Settings** `/settings` | Workspace profile, members and roles (owner / admin / member), invitations, profile and password, notification preferences, email outbox |
+| **Shell** | ⌘K / Ctrl+K command palette, notifications bell, workspace switcher, help center |
+
+<table>
+  <tr>
+    <td><img src="docs/screenshots/customers.jpg" alt="Customer profile drawer" /><br /><sub>Customers: profile drawer with account management</sub></td>
+    <td><img src="docs/screenshots/sales.jpg" alt="Sales orders" /><br /><sub>Sales: order composer and sales register</sub></td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/tasks.jpg" alt="Tasks kanban" /><br /><sub>Tasks: kanban board with filters</sub></td>
+    <td><img src="docs/screenshots/invoice.jpg" alt="Printable invoice" /><br /><sub>Invoices: printable invoice with payments and balance</sub></td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/reports.jpg" alt="Reports" /><br /><sub>Reports: revenue, pipeline, aging and throughput</sub></td>
+    <td><img src="docs/screenshots/settings-members.jpg" alt="Team members settings" /><br /><sub>Settings: members, access levels and invitations</sub></td>
+  </tr>
+  <tr>
+    <td colspan="2"><img src="docs/screenshots/command-palette.jpg" alt="Command palette" /><br /><sub>⌘K command palette: workspace-scoped search across customers, orders and tasks</sub></td>
+  </tr>
+</table>
+
+<details>
+<summary>Full feature list per route</summary>
+
+| Route | What you can do |
+| --- | --- |
+| `/` | KPIs, revenue trend, revenue by category, critical tasks, recent sales, team activity, overdue receivables. Filters (`?category=`, `?customer=`, `?assignee=`) with removable chips. Send Reminder emails the customer and shows the outbox status. Live Sync re-renders every 30 s while the tab is visible. |
+| `/activity` | Team activity log with category, member and record-type filters and pagination. |
+| `/customers` | Search, filters, pagination, detail drawer, create / edit, status and tier changes, archive / unarchive (`?status=archived`), delete (only without orders or tasks), row menu, bulk Send Campaign / Apply Tier Tag / Archive / Delete. `GET /customers/export` (CSV). |
+| `/sales` | KPIs, status tabs, create orders with line items, status transitions, edit drafts and pending orders (`?edit=SL-xxxx`), delete unpaid drafts or cancelled orders, partial payments up to the balance. `GET /api/orders` (JSON / CSV with `paidCents` / `balanceCents`). |
+| `/tasks` | Server-side search (`?q=`) with assignee, priority, client and due filters; drag and drop (moving to Blocked asks for a reason); create / edit / duplicate / delete; checklist; comments with `@` autocomplete and mention notifications; attachments; time tracking. |
+| `/invoices` | KPI tiles, All / Open / Overdue / Paid tabs, search, filters, pagination; `/invoices/<number>` printable invoice with Send invoice, Send reminder, Mark as paid, Record payment. `GET /invoices/export` (CSV). |
+| `/reports` | Presets (this month, last month, this quarter, year to date, last 12 months, custom). `GET /reports/export?section=…` (CSV per section). |
+| `/settings` | Tabs: Workspace, Members, Profile, Notifications, Email (outbox with retry for failed deliveries). |
+| `/invite/<token>` | Accept a workspace invitation. |
+| `/help` | Getting started, keyboard shortcuts, module guides, FAQ, contact form (emails `SUPPORT_EMAIL`). |
+| `/login`, `/register` | Email + password; registration creates a new workspace owned by the new user. |
+
+</details>
+
+---
+
+## Tech stack
+
+| Layer | Choice |
+| --- | --- |
+| Framework | Next.js 16 (App Router, Cache Components, Server Actions, Route Handlers), React 19 |
+| Language | TypeScript (strict) |
+| Styling | Tailwind CSS v4 with design tokens in `src/app/globals.css` |
+| Data | SQLite through libSQL + Drizzle ORM, Zod validation |
+| Auth | Better Auth (email + password, database sessions, Drizzle adapter) |
+| Email | Nodemailer over SMTP, or an outbox-only log transport |
+| Testing | Vitest (unit + integration on real SQLite), Playwright (end to end) |
+
+---
+
+## Architecture
+
+Screaming architecture with a hexagonal-lite core: folders are named after business features, and each feature keeps its rules independent of the framework and the database.
+
+```mermaid
+flowchart LR
+  Browser -->|request| Proxy["proxy.ts<br/>(session cookie check)"]
+  Proxy --> Routes["app/<br/>pages, Server Actions,<br/>Route Handlers"]
+  Routes -->|getWorkspaceApp| Ctx["request-context.ts<br/>user, workspace, role"]
+  Ctx --> Container["container.ts<br/>forWorkspace(id)"]
+  Container --> UseCases["modules/*/application<br/>use cases + ports"]
+  UseCases --> Domain["modules/*/domain<br/>pure business rules"]
+  UseCases --> Repos["modules/*/infrastructure<br/>Drizzle repositories"]
+  Repos --> DB[(SQLite)]
+```
+
+| Concern | How it works |
+| --- | --- |
+| **Feature modules** | `src/modules/<feature>/` holds `domain/` (types and pure rules), `application/` (ports and use cases), `infrastructure/` (Drizzle adapters) and `ui/` (Server Actions and components). |
+| **Composition root** | Only `src/server/container.ts` and `src/server/auth.ts` import the database client. `forWorkspace(id)` wires workspace-scoped repositories into use cases. |
+| **Request context** | `src/server/request-context.ts` resolves `{ user, workspace, role, member }` once per request. Pages, actions and route handlers never pick a workspace themselves. |
+| **Workspace tenancy** | Business tables carry `workspace_id`; every repository is constructed for one workspace, so another tenant's ids return nothing. The active workspace cookie is honoured only for workspaces the user belongs to. |
+| **Auth** | Better Auth with database sessions. `src/proxy.ts` is only an optimistic redirect; the real check is the session lookup in the request context. Sign-up provisions a new workspace with the user as owner. |
+| **Permissions** | Owner / admin / member rules live in use cases (`assertCan`), never only in the UI. The last owner can never be demoted or removed. |
+| **Money and time** | Money is integer cents. "Overdue" is derived from due dates, never stored. |
+
+---
+
+## Quality
+
+| Check | What it covers |
+| --- | --- |
+| **436 Vitest tests** (66 files) | Domain rules, use cases, schemas, and repositories against a real temporary SQLite database, including workspace isolation |
+| **Playwright happy path** | Sign in, add a customer, create and confirm a sale, record a full payment, move a task, sign out, in a real browser against a production build |
+| **Test-first** | Behaviour changes were written test-first: a failing test (RED) was observed before the implementation (GREEN) |
+| **Independent security verification** | Features were checked by independent verification passes. Fixes they found include an open-redirect guard on post-login redirects, single-recipient email validation, path-safe attachment storage and transactional payment limits |
+| **Static checks** | `pnpm typecheck` (strict TypeScript) and `pnpm lint` (ESLint) |
+
+---
 
 ## Getting started
 
+Requirements: Node.js 20+ and pnpm.
+
 ```bash
 pnpm install
-cp .env.example .env.local   # optional in development (see Environment)
-pnpm db:reset                # migrate + seed
-pnpm dev
+pnpm db:reset    # migrate + seed demo data into data/ikizen.db
+pnpm dev         # http://localhost:3000
 ```
 
-Open http://localhost:3000 and sign in with the demo account (shown on the login page in development):
+Sign in as `alex@northstar.studio` / `ikizen-demo-123`. Alex owns two workspaces: **Northstar Studio** (full demo dataset) and **Helix Labs Sandbox** (small dataset). Switch from the workspace card at the top of the sidebar.
 
-| Email | Password | Workspaces |
-| --- | --- | --- |
-| `alex@northstar.studio` | `ikizen-demo-123` | Northstar Studio (owner, full design dataset), Helix Labs Sandbox (owner, small dataset) |
+> [!TIP]
+> The seed uses dates relative to today. Re-run `pnpm db:reset` to refresh due dates and trends.
 
-Switch or create workspaces from the workspace card at the top of the sidebar. The seed adds a few notifications for Alex (two unread) and two outbox entries. Upgrading a database created before workspaces existed requires `pnpm db:reset` (the migration adds required `workspace_id` columns).
+No `.env` file is required for local development; see [Environment variables](#environment-variables) for production.
 
-## Environment
+### End-to-end tests
+
+```bash
+pnpm exec playwright install chromium   # once
+pnpm test:e2e
+```
+
+Playwright builds the app and serves it on port 3520 (`E2E_PORT` to change it) against an isolated database (`data/e2e.db`, uploads in `data/e2e-uploads`), so development data is never touched. If the bundled browser cannot be downloaded, use a system Chromium: `PLAYWRIGHT_CHROMIUM_PATH=/usr/bin/chromium pnpm test:e2e`.
+
+`pnpm screenshots` uses the same isolated server to regenerate the images in `docs/screenshots/`.
+
+---
+
+## Deployment
+
+The app is deployed to [Vercel](https://vercel.com) through GitHub Actions on every push to `main`.
+
+Live demo: _coming soon_
+
+---
+
+## Reference
+
+### Environment variables
 
 | Variable | Default | Notes |
 | --- | --- | --- |
 | `DATABASE_URL` | `file:./data/ikizen.db` | libSQL URL |
-| `BETTER_AUTH_SECRET` | development-only secret | Required in production (`next start`): at least 32 characters, e.g. `openssl rand -base64 32`. The server refuses to start without it. |
-| `BETTER_AUTH_URL` | `http://localhost:3000` | Public origin of the app (set it when serving on another host or port). |
-| `SMTP_HOST` | unset | When set, emails are delivered through SMTP (nodemailer). Unset: emails are only recorded in the outbox with status `logged`. |
-| `SMTP_PORT` / `SMTP_SECURE` | `587` / `true` only on port 465 | SMTP port and implicit TLS. |
-| `SMTP_USER` / `SMTP_PASS` | unset | SMTP credentials (optional). |
-| `SMTP_FROM` | `Ikizen Flow <no-reply@ikizen.local>` | Sender address. |
-| `SUPPORT_EMAIL` | `support@ikizen.local` | Recipient of the Help page contact form. |
-| `UPLOADS_DIR` | `data/uploads` | Directory for task attachment files (absolute, or relative to the app's working directory). Files live under `<UPLOADS_DIR>/<workspaceId>/<uuid>`; the default location is gitignored. `pnpm db:reset` / `db:seed` delete the workspace folders in it before seeding. |
+| `BETTER_AUTH_SECRET` | development-only value | **Required in production**: at least 32 characters (`openssl rand -base64 32`). The server refuses to start without it. |
+| `BETTER_AUTH_URL` | `http://localhost:3000` | Public origin of the app; also used for links in emails |
+| `SMTP_HOST` | unset | When set, emails are delivered over SMTP. When unset, they are only recorded in the outbox as `logged`. |
+| `SMTP_PORT` | `587` | SMTP port |
+| `SMTP_SECURE` | `true` only on port 465 | Implicit TLS |
+| `SMTP_USER` / `SMTP_PASS` | unset | SMTP credentials (optional) |
+| `SMTP_FROM` | `Ikizen Flow <no-reply@ikizen.local>` | Sender address |
+| `SUPPORT_EMAIL` | `support@ikizen.local` | Recipient of the Help page contact form |
+| `UPLOADS_DIR` | `data/uploads` | Task attachment storage (absolute, or relative to the working directory) |
 
-## Scripts
+### Scripts
 
 | Script | Description |
 | --- | --- |
@@ -68,76 +209,64 @@ Switch or create workspaces from the workspace card at the top of the sidebar. T
 | `pnpm typecheck` | `next typegen` + `tsc --noEmit` |
 | `pnpm lint` | ESLint |
 | `pnpm test` / `test:watch` | Vitest |
-| `pnpm test:e2e` | Playwright end-to-end happy path (see below) |
+| `pnpm test:e2e` | Playwright end-to-end happy path |
+| `pnpm screenshots` | Regenerate README screenshots |
 | `pnpm db:generate` | Generate Drizzle migrations from the schema |
 | `pnpm db:migrate` / `db:seed` / `db:reset` | Apply migrations, seed demo data, or both from scratch |
 
-The seed uses dates relative to "now", so re-run `pnpm db:reset` to refresh due dates and trends.
-
-### End-to-end tests
-
-`e2e/happy-path.spec.ts` drives the real UI in Chromium: sign in as the demo user, add a customer, create and confirm a sale, record a payment for the full balance, move a task with the "Move to" select, and log out.
-
-```bash
-pnpm exec playwright install chromium   # once
-pnpm test:e2e
-```
-
-The Playwright `webServer` resets an isolated database (`data/e2e.db`, uploads in `data/e2e-uploads`), runs `next build` and serves the app with `next start` on port 3520 (`E2E_PORT` to change it) with a test-only `BETTER_AUTH_SECRET` and no SMTP, so your development data is never touched. Port 3520 must be free; an existing server is never reused. Google Fonts requests are aborted to keep the run offline-safe. If the bundled browser cannot be downloaded, point Playwright at a system Chromium: `PLAYWRIGHT_CHROMIUM_PATH=/usr/bin/chromium pnpm test:e2e`. Failure traces and screenshots land in `test-results/` (gitignored).
-
-## Architecture
-
-Screaming, hexagonal-lite structure organized by feature:
+### Project structure
 
 ```
 src/
-  app/                       # thin routes (containers): pages, layouts, route handlers
-  proxy.ts                   # optimistic auth redirect (Next 16 Proxy, formerly Middleware)
-  modules/<feature>/         # auth, workspaces, customers, sales, invoices, reports, tasks, dashboard, activity, team, mail, notifications, search, help
-    domain/                  # types and pure business rules (tested)
-    application/             # ports (repository interfaces) and use cases
-    infrastructure/          # Drizzle repositories implementing the ports
-    ui/                      # Server Actions and presentational components
+  app/                  # thin routes: pages, layouts, route handlers
+  proxy.ts              # optimistic auth redirect (Next 16 Proxy)
+  modules/<feature>/    # auth, workspaces, customers, sales, invoices, reports, tasks,
+    domain/             #   dashboard, activity, team, mail, notifications, search, help
+    application/
+    infrastructure/
+    ui/
   server/
-    auth.ts                  # Better Auth instance (Drizzle adapter, sign-up hook)
-    container.ts             # composition root: forWorkspace(id) wires scoped repositories into use cases
-    request-context.ts       # session -> { user, workspace, role, member } per request
-    db/                      # schema, client, seed
+    auth.ts             # Better Auth instance
+    container.ts        # composition root
+    request-context.ts  # session -> user, workspace, role, member
+    db/                 # schema, client, seed
   shared/
-    ui/                      # design-system primitives (Button, Badge, Card, ...)
-    shell/                   # sidebar, topbar, mobile navigation
-    domain/                  # money (integer cents) and time helpers
+    ui/                 # design-system primitives
+    shell/              # sidebar, topbar, mobile navigation
+    domain/             # money and time helpers
+drizzle/                # SQL migrations
+e2e/                    # Playwright specs and screenshot capture
+design/                 # Google Stitch design export (screens + DESIGN.md)
 ```
 
-Conventions:
+<details>
+<summary>Domain notes (payments, invoices, attachments, team, email)</summary>
 
-- Only `src/server/container.ts` and `src/server/auth.ts` import the database client.
-- Pages, Server Actions and Route Handlers never pick a workspace themselves; they get it from the session (see Authentication and workspaces).
-- Money is stored as integer cents. "Overdue" is derived from due dates, never stored.
-- With Cache Components enabled, request-time data (DB reads, `searchParams`, `new Date()`) lives in async children wrapped in `<Suspense>` after `await connection()`.
+- **Payments**: balance = order total − sum of payments. Payments are accepted on open orders up to the balance; a fully paid order completes automatically. The balance check, insert and completion run in one transaction, so concurrent payments can never exceed the total. Orders with payments cannot be edited or deleted.
+- **Invoices**: an invoice is an `invoiced` or `completed` order with an invoice number. Display status is derived: completed = Paid, invoiced past due = Overdue, otherwise Open. Money is never recomputed here; payments go through the sales use cases.
+- **Reports**: URL presets resolve to a half-open UTC range (custom ranges capped at five years); pure functions aggregate workspace-scoped facts. Aging is always as of today.
+- **Attachments**: 10 MB limit, extension allowlist, MIME type derived server-side, sanitized file names, random storage keys validated on every read so paths cannot escape `UPLOADS_DIR`. Downloads always use `Content-Disposition: attachment` and `nosniff`.
+- **Comments and mentions**: mentions are stored as `@[Name](memberId)`; only newly mentioned members are notified, and only the author can edit or delete a comment.
+- **Team**: removing a member revokes access, unassigns their open tasks and keeps their name on past work. Invitations last 7 days and only a SHA-256 hash of the token is stored.
+- **Email outbox**: every email is stored (`queued`), delivered through SMTP or the log transport, and recorded as `sent`, `logged` or `failed`. Delivery failures never break the action that sent the email.
+- **Notifications**: per member and type, in-app (default on) and email (default off).
+- **Workspace deletion**: owners only, with typed name confirmation; never the user's last workspace.
 
-## Authentication and workspaces
+</details>
 
-- **Better Auth** (`src/server/auth.ts`) handles email + password with database sessions (`user`, `session`, `account`, `verification` tables in the Drizzle schema). Endpoints are mounted at `/api/auth/[...all]`; the `nextCookies` plugin lets Server Actions set the session cookie. `src/modules/auth/ui/auth-client.ts` exports a browser client for client-side session hooks.
-- **Workspaces**: `workspaces` + `workspace_memberships` (`owner` / `admin` / `member`). `members` are per-workspace people with an optional `user_id` (teammates without a login are allowed). Customers, orders, tasks, activity events and members carry `workspace_id`; order items and subtasks are reached through their parent. Company names, order references, invoice numbers and task codes are unique per workspace.
-- **Registration**: every sign-up (the `/register` form or `POST /api/auth/sign-up/email`) runs a Better Auth `user.create.after` hook that provisions a new workspace (optional `workspaceName` body field) with the user as owner.
-- **Request context** (`src/server/request-context.ts`, server-only, memoised per request):
-  - `getRequestContext()` returns `{ user, workspace, role, member, memberships }` or `null`. The active workspace comes from the `ikizen_workspace` cookie only when the user is a member of it, otherwise the first workspace.
-  - Pages / Server Components: `const { ctx, app } = await getWorkspaceApp("/current-path")` (redirects to `/login?next=...` when signed out). `app` holds the use cases bound to `ctx.workspace.id`; pass `ctx.member.id` as the actor of mutations.
-  - Server Actions: `const { ctx, app } = await getWorkspaceApp()` as the first statement.
-  - Route Handlers: `const auth = await authorizeRoute(); if (auth instanceof Response) return auth;` (401 JSON when signed out).
-  - `switchWorkspaceAction` and `listMyWorkspaces()` (`src/modules/workspaces/ui/`) power the workspace switcher; `signOutAction` ends the session.
-- **Email outbox** (`src/modules/mail/`): `app.mail.send({ to, subject, text, html?, kind, relatedEntityType?, relatedEntityId?, createdById? })` stores the email in `email_outbox` (`queued`), delivers it through the configured `Mailer` (SMTP or log) and records `sent`, `logged` or `failed` (with the error). It never throws on delivery failures; check the returned `status`. `app.mail.outbox({ kind?, status?, page? })` lists the workspace outbox.
-- **Notifications** (`src/modules/notifications/`): `app.notifications.notify({ recipientIds, actorId, type, title, body?, href? })` creates one notification per recipient, skipping the actor, duplicates and members of other workspaces; `href` must be a relative path. Task, sales and dashboard use cases receive `notify` as an optional dependency and emit on task assignment (create), order status changes, payments recorded and payment reminders (recipient: the order's creator from the activity log).
-- **Task comments** (`task_comments`, `src/modules/tasks/domain/comment.ts`): the card counter is derived from the table. Mentions are stored inline as `@[Name](memberId)`; the composer shows `@Name` and serializes picked members on submit. Adding a comment notifies every mentioned member (type `mention`, link `/tasks?task=<id>`); editing notifies only newly added mentions. Only the author can edit or delete a comment. Migration `0005` moves legacy "commented: ..." activity events into the table.
-- **Task attachments** (`task_attachments`, `src/modules/tasks/domain/attachment.ts`): uploads go through a Server Action (multipart `FormData` file). Limits: 10 MB per file and an extension allowlist (png, jpg, jpeg, gif, webp, pdf, txt, csv, md, doc(x), xls(x), ppt(x), zip); the stored MIME type is derived from the extension, never from the client, and file names are sanitized (last path segment only, no control or unsafe characters, max 120 characters). Bytes are written by `LocalAttachmentStorage` under random keys that are validated on every read, so stored paths cannot escape `UPLOADS_DIR`. `GET /api/attachments/<id>` (session required, 404 for ids of other workspaces) always answers as a download with `X-Content-Type-Options: nosniff`. Deleting an attachment or its task removes the files. `next.config.ts` raises the Server Action body limit to 11 MB (`experimental.serverActions.bodySizeLimit`; the Next.js default is 1 MB) so 10 MB files plus multipart overhead fit.
-- **Time tracking** (`task_time_entries`, `src/modules/tasks/domain/time-entry.ts`): "Log time" records quarter-hour entries (0.25 to 24 hours, optional note) for the signed-in member; a task's tracked hours are the sum of its entries, and members can delete only their own entries.
-- **Payments** (`payments` table, `src/modules/sales/domain/payment.ts`): balance = order total - sum(payments). `app.sales.recordPayment(reference, { amountCents, method, paidAt?, reference?, note? }, actorId)` accepts payments on open orders up to the balance; a fully paid processing / invoiced order moves to `completed` with the settling payment's `paidAt`. "Mark as Paid" records the remaining balance as a payment, and deleting a payment of a completed order that is no longer fully paid reopens it as `invoiced`. The balance check, the insert and the automatic completion run in one database transaction in `DrizzlePaymentRepository.record` / `settleBalance`, so concurrent payments can never exceed the total. Orders with any recorded payment are locked: they cannot be edited ("Remove recorded payments before editing this order") or deleted ("Orders with recorded payments cannot be deleted"); the drawer explains why, and the order repository re-checks payments inside the DELETE statement. The `payments.order_id` foreign key keeps `ON DELETE cascade` (changing it to `restrict` would mean a SQLite table rebuild); the domain rule plus the guarded DELETE make that cascade unreachable for paid orders. Migration `0007` backfills one payment (equal to the total, at `paid_at` or the issue date) for completed orders that predate the payments table. The topbar bell lists them (unread first) and marks them read.
-- **Invoices** (`src/modules/invoices/`): an invoice is an order in status `invoiced` or `completed` that has an `invoice_number` (assigned by the sales lifecycle when an order is issued). Display status is derived: `completed` = Paid, `invoiced` past its due date = Overdue, otherwise Open. Money is never recomputed here: balances come from `orderBalance`, Record payment / Mark as paid go through `app.sales.recordPayment` / `changeStatus(…, "completed")` (`settleBalance`), and Issue invoice is `changeStatus(…, "invoiced")`. `app.invoices.send` / `sendReminder` email the client's billing (or contact) address through the outbox (kinds `invoice` / `reminder`) with a link built from `BETTER_AUTH_URL`, record an activity event and return the outbox status (`sent`, `logged` or `failed`) shown to the user. When printing, the app shell is hidden (`print:hidden`).
-- **Reports** (`src/modules/reports/`): `resolveReportRange` turns `preset` / `from` / `to` URL params into a half-open UTC range (custom ranges are inclusive days, swapped when reversed, capped at five years; unknown values fall back to the last 12 months). `DrizzleReportsRepository` reads workspace-scoped facts and the pure functions in `domain/reports.ts` aggregate them; aging is always as of today.
-- **Team management** (`src/modules/team/`, `src/modules/workspaces/domain/permissions.ts`): owners can do everything; admins manage the workspace profile, members (except owners), invitations and the outbox; members have read-only workspace settings and manage only their own profile and notification preferences. Use cases enforce the rules (`assertCan`, `roleChangeBlockedReason`, `removalBlockedReason`): only owners grant or revoke ownership, the last owner can never be demoted or removed, and nobody removes themselves. Removing a member deletes their membership (no more access), unassigns their open tasks and soft-removes the member row (`members.removed_at`), so activity, comments, payments and completed tasks keep their name; removed members disappear from pickers and notifications, and re-adding the same email restores the row.
-- **Invitations** (`workspace_invitations`): inviting an email that already has an account adds the membership directly (linking an existing teammate row with that email); otherwise a 7-day invitation is created and emailed (`kind: "invite"`) with a `/invite/<token>` link built from `BETTER_AUTH_URL`. Only a SHA-256 hash of the 256-bit token is stored. Accepting requires being signed in with the invited email, works once and not after expiry; re-inviting replaces the previous link.
-- **Notification preferences** (`notification_preferences`): per member and type, in-app (default on) and email (default off). `notify()` skips members who turned the in-app notification off and also emails (`kind: "notification"`, absolute link) those who turned email on; email failures never break the action that notified.
-- **Workspace deletion**: owners only, typed name confirmation, refused for the user's last workspace. Orders and payments are deleted first (`orders.customer_id` is `RESTRICT`), then the workspace row cascades to everything else; attachment files are removed from disk afterwards.
-- **Payment reminders from the dashboard**: `app.dashboard.sendReminder(reference, actorId, { issuer, baseUrl })` only accepts overdue orders, emails the customer's billing (or contact) address through the outbox (`kind: "reminder"`, link to the invoice), records a billing activity with the delivery status and notifies the order's creator.
-- **Route protection**: `src/proxy.ts` only checks that a session cookie exists (redirects pages to `/login?next=...`, returns 401 for `/api/*`). It is an optimisation; the real check is the database session lookup in the request context.
+---
+
+## Known limitations
+
+- Signing out from an invitation link with the wrong account returns to `/login` without keeping the invitation.
+- Members cannot leave a workspace by themselves (an owner or admin removes them).
+- No SQLite busy timeout: truly simultaneous writes can rarely fail with `SQLITE_BUSY`.
+- Attachments are stored on the local disk, so a serverless deployment needs a persistent volume or an object-storage adapter.
+
+---
+
+## Credits and license
+
+UI and UX are based on a [Google Stitch](https://stitch.withgoogle.com) design export, kept in [`design/`](design/) together with its design-token spec.
+
+All rights reserved — Ikizen Agency.
