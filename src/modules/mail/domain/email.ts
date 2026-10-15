@@ -71,7 +71,12 @@ export function resolveSupportEmail(env: Record<string, string | undefined>): st
   return env.SUPPORT_EMAIL?.trim() || DEFAULT_SUPPORT_EMAIL;
 }
 
-const EMAIL_PATTERN = /^[^\s@<>]+@[^\s@<>]+$/;
+/** Exactly one bare address: no lists (`,` `;`), display names (`<` `>`), whitespace, control characters or extra `@`. */
+const EMAIL_PATTERN = /^[^@<>,;\s\u0000-\u001F\u007F]+@[^@<>,;\s\u0000-\u001F\u007F]+$/;
+
+export function isSingleEmailAddress(value: string): boolean {
+  return EMAIL_PATTERN.test(value);
+}
 
 export class InvalidEmailError extends Error {
   constructor(message: string) {
@@ -82,7 +87,7 @@ export class InvalidEmailError extends Error {
 
 /** Rejects messages that could never be delivered (and header injection through CR/LF). */
 export function assertValidEmail(message: EmailMessage) {
-  if (!EMAIL_PATTERN.test(message.to.trim())) throw new InvalidEmailError(`Invalid recipient address: ${message.to}`);
+  if (!isSingleEmailAddress(message.to.trim())) throw new InvalidEmailError(`Invalid recipient address: ${message.to}`);
   if (!message.subject.trim()) throw new InvalidEmailError("Email subject is required.");
   if (/[\r\n]/.test(message.subject)) throw new InvalidEmailError("Email subject must be a single line.");
   if (!message.text.trim()) throw new InvalidEmailError("Email body is required.");

@@ -1,3 +1,4 @@
+import { hasControlOrWhitespace } from "@/shared/domain/control-characters";
 export const NOTIFICATION_TYPES = ["task_assigned", "order_status", "payment_reminder", "mention", "system"] as const;
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
 
@@ -32,7 +33,7 @@ export interface NewNotification {
 /** Only same-origin relative paths are stored as notification targets. */
 export function safeNotificationHref(href: string | null | undefined): string | null {
   if (!href) return null;
-  return href.startsWith("/") && !href.startsWith("//") && !/[\\\s]/.test(href) ? href : null;
+  return href.startsWith("/") && !href.startsWith("//") && !href.includes("\\") && !hasControlOrWhitespace(href) ? href : null;
 }
 
 /**
