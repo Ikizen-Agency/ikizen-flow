@@ -46,6 +46,11 @@ Switch workspaces from the workspace card at the top of the sidebar. Upgrading a
 | `DATABASE_URL` | `file:./data/ikizen.db` | libSQL URL |
 | `BETTER_AUTH_SECRET` | development-only secret | Required in production (`next start`): at least 32 characters, e.g. `openssl rand -base64 32`. The server refuses to start without it. |
 | `BETTER_AUTH_URL` | `http://localhost:3000` | Public origin of the app (set it when serving on another host or port). |
+| `SMTP_HOST` | unset | When set, emails are delivered through SMTP (nodemailer). Unset: emails are only recorded in the outbox with status `logged`. |
+| `SMTP_PORT` / `SMTP_SECURE` | `587` / `true` only on port 465 | SMTP port and implicit TLS. |
+| `SMTP_USER` / `SMTP_PASS` | unset | SMTP credentials (optional). |
+| `SMTP_FROM` | `Ikizen Flow <no-reply@ikizen.local>` | Sender address. |
+| `SUPPORT_EMAIL` | `support@ikizen.local` | Recipient of the Help page contact form. |
 
 ## Scripts
 
@@ -102,4 +107,6 @@ Conventions:
   - Server Actions: `const { ctx, app } = await getWorkspaceApp()` as the first statement.
   - Route Handlers: `const auth = await authorizeRoute(); if (auth instanceof Response) return auth;` (401 JSON when signed out).
   - `switchWorkspaceAction` and `listMyWorkspaces()` (`src/modules/workspaces/ui/`) power the workspace switcher; `signOutAction` ends the session.
+- **Email outbox** (`src/modules/mail/`): `app.mail.send({ to, subject, text, html?, kind, relatedEntityType?, relatedEntityId?, createdById? })` stores the email in `email_outbox` (`queued`), delivers it through the configured `Mailer` (SMTP or log) and records `sent`, `logged` or `failed` (with the error). It never throws on delivery failures; check the returned `status`. `app.mail.outbox({ kind?, status?, page? })` lists the workspace outbox.
+- **Notifications** (`src/modules/notifications/`): `app.notifications.notify({ recipientIds, actorId, type, title, body?, href? })` creates one notification per recipient, skipping the actor, duplicates and members of other workspaces; `href` must be a relative path. Task, sales and dashboard use cases receive `notify` as an optional dependency and emit on task assignment (create), order status changes and payment reminders (recipient: the order's creator from the activity log). The topbar bell lists them (unread first) and marks them read.
 - **Route protection**: `src/proxy.ts` only checks that a session cookie exists (redirects pages to `/login?next=...`, returns 401 for `/api/*`). It is an optimisation; the real check is the database session lookup in the request context.

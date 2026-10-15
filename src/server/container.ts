@@ -11,6 +11,20 @@ import {
   makeListCustomers,
 } from "@/modules/customers/application/use-cases";
 import { DrizzleCustomerRepository } from "@/modules/customers/infrastructure/drizzle-customer-repository";
+import { makeListOutbox, makeSendEmail } from "@/modules/mail/application/use-cases";
+import { resolveMailerConfig, resolveSupportEmail } from "@/modules/mail/domain/email";
+import { DrizzleEmailOutbox } from "@/modules/mail/infrastructure/drizzle-email-outbox";
+import { createMailer } from "@/modules/mail/infrastructure/mailers";
+import {
+  makeCountUnreadNotifications,
+  makeListNotifications,
+  makeMarkAllNotificationsRead,
+  makeMarkNotificationRead,
+  makeNotify,
+} from "@/modules/notifications/application/use-cases";
+import { DrizzleNotificationRepository } from "@/modules/notifications/infrastructure/drizzle-notification-repository";
+import { makeGlobalSearch } from "@/modules/search/application/use-cases";
+import { DrizzleSearchRepository } from "@/modules/search/infrastructure/drizzle-search-repository";
 import {
   makeChangeOrderStatus,
   makeCreateOrder,
@@ -31,12 +45,14 @@ import {
 } from "@/modules/tasks/application/use-cases";
 import { DrizzleTaskRepository } from "@/modules/tasks/infrastructure/drizzle-task-repository";
 import { DrizzleMemberRepository } from "@/modules/team/infrastructure/drizzle-member-repository";
-import { makeListMyWorkspaces } from "@/modules/workspaces/application/use-cases";
+import { makeCreateWorkspace, makeListMyWorkspaces } from "@/modules/workspaces/application/use-cases";
 import { DrizzleWorkspaceDirectory } from "@/modules/workspaces/infrastructure/drizzle-workspace-directory";
 import { db } from "./db/client";
 
 const clock = systemClock;
 const workspaceDirectory = new DrizzleWorkspaceDirectory(db);
+/** SMTP when `SMTP_HOST` is set, otherwise the log transport (outbox only). */
+const mailer = createMailer(resolveMailerConfig(process.env));
 
 /**
  * Composition root: the only place that knows which adapters implement each port.
@@ -54,8 +70,13 @@ export function forWorkspace(workspaceId: number) {
     activity: new DrizzleActivityRepository(db, workspaceId),
     members: new DrizzleMemberRepository(db, workspaceId),
     dashboard: new DrizzleDashboardRepository(db, workspaceId),
+    notifications: new DrizzleNotificationRepository(db, workspaceId),
+    outbox: new DrizzleEmailOutbox(db, workspaceId),
+    search: new DrizzleSearchRepository(db, workspaceId),
   };
-  const deps = { ...repositories, clock };
+  const notify = makeNotify({ notifications: repositories.notifications, clock });
+  // `notify` is an optional dependency of task, sales and dashboard use cases (they emit notifications).
+  const deps = { ...repositories, clock, notify };
 
   return {
     workspaceId,
@@ -94,6 +115,23 @@ export function forWorkspace(workspaceId: number) {
       overview: makeGetDashboard(deps),
       sendReminder: makeSendPaymentReminder(deps),
     },
+    notifications: {
+      /** `notify({ recipientIds, actorId, type, title, body?, href? })`: skips the actor and foreign members. */
+      notify,
+      list: makeListNotifications(deps),
+      unreadCount: makeCountUnreadNotifications(deps),
+      markRead: makeMarkNotificationRead(deps),
+      markAllRead: makeMarkAllNotificationsRead(deps),
+    },
+    mail: {
+      /** Persists to the outbox, then delivers (SMTP or log); returns the entry with its final status. */
+      send: makeSendEmail({ outbox: repositories.outbox, mailer, clock }),
+      outbox: makeListOutbox(deps),
+      transport: mailer.transport,
+    },
+    search: {
+      global: makeGlobalSearch(deps),
+    },
   } as const;
 }
 
@@ -103,4 +141,6 @@ export type WorkspaceApp = ReturnType<typeof forWorkspace>;
 export const directory = {
   clock,
   listMyWorkspaces: makeListMyWorkspaces({ workspaces: workspaceDirectory }),
+  createWorkspace: makeCreateWorkspace({ workspaces: workspaceDirectory, clock }),
+  supportEmail: resolveSupportEmail(process.env),
 } as const;

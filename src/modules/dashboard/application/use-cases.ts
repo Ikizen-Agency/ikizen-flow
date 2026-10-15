@@ -1,5 +1,6 @@
 import type { ActivityRepository } from "../../activity/application/ports";
 import type { CustomerRepository } from "../../customers/application/ports";
+import type { Notify } from "../../notifications/application/use-cases";
 import type { OrderRepository } from "../../sales/application/ports";
 import { onTimeDeliveryRate } from "../../sales/domain/metrics";
 import { daysOverdue, effectiveOrderStatus } from "../../sales/domain/order";
@@ -101,7 +102,7 @@ export class ReminderNotAllowedError extends Error {
 
 /** Logs a payment reminder for an overdue order. Delivery (email) is out of scope; the audit trail is the record. */
 export const makeSendPaymentReminder =
-  ({ orders, activity, clock }: Pick<DashboardDeps, "orders" | "activity" | "clock">) =>
+  ({ orders, activity, clock, notify }: Pick<DashboardDeps, "orders" | "activity" | "clock"> & { notify?: Notify }) =>
   async (reference: string, actorId: number | null) => {
     const now = clock();
     const order = await orders.findByReference(reference);
@@ -115,5 +116,15 @@ export const makeSendPaymentReminder =
       entityId: order.id,
       createdAt: now,
     });
+    if (notify) {
+      await notify({
+        recipientIds: [await activity.originatorOf("order", order.id)],
+        actorId,
+        type: "payment_reminder",
+        title: `Payment reminder sent for ${order.invoiceNumber ?? order.reference}`,
+        body: order.customerCompany,
+        href: `/sales?order=${encodeURIComponent(order.reference)}`,
+      });
+    }
     return { company: order.customerCompany };
   };

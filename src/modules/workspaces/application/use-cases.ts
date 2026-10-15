@@ -39,3 +39,32 @@ export const makeProvisionWorkspace =
       clock(),
     );
   };
+
+export const WORKSPACE_NAME_MAX_LENGTH = 60;
+
+export class InvalidWorkspaceNameError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "InvalidWorkspaceNameError";
+  }
+}
+
+export interface CreateWorkspaceInput extends ProvisionWorkspaceInput {
+  workspaceName: string;
+}
+
+/**
+ * "Create workspace" from the switcher: the signed-in user gets an additional workspace they own.
+ * Same provisioning as registration (unique slug, owner member profile and owner membership), but the name is required.
+ */
+export const makeCreateWorkspace = (deps: WorkspaceDeps) => {
+  const provision = makeProvisionWorkspace(deps);
+  return async (input: CreateWorkspaceInput) => {
+    const workspaceName = input.workspaceName.trim();
+    if (!workspaceName) throw new InvalidWorkspaceNameError("Workspace name is required.");
+    if (workspaceName.length > WORKSPACE_NAME_MAX_LENGTH) {
+      throw new InvalidWorkspaceNameError(`Workspace name must be at most ${WORKSPACE_NAME_MAX_LENGTH} characters.`);
+    }
+    return provision({ ...input, workspaceName });
+  };
+};

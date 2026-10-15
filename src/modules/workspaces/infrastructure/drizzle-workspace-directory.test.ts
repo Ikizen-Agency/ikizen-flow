@@ -3,7 +3,7 @@ import type { Database } from "@/server/db/connect";
 import { user } from "@/server/db/schema";
 import { seedDatabase, type SeedSummary } from "@/server/db/seed/seed";
 import { createTestDatabase } from "@/test/test-database";
-import { makeListMyWorkspaces, makeProvisionWorkspace } from "../application/use-cases";
+import { InvalidWorkspaceNameError, makeCreateWorkspace, makeListMyWorkspaces, makeProvisionWorkspace } from "../application/use-cases";
 import { DrizzleWorkspaceDirectory } from "./drizzle-workspace-directory";
 
 const now = new Date("2026-10-14T12:00:00Z");
@@ -57,5 +57,29 @@ describe("registration provisioning", () => {
     const created = await makeProvisionWorkspace(deps())({ userId: "u-sam", name: "Sam Okoro", email: "sam@example.com" });
     expect(created.workspace.name).toBe("Sam's Workspace");
     expect(created.workspace.slug).toBe("sam-s-workspace");
+  });
+});
+
+describe("create workspace", () => {
+  it("creates an additional workspace owned by the signed-in user, reusing registration provisioning", async () => {
+    const create = makeCreateWorkspace(deps());
+    const created = await create({ userId: seed.demoUserId, name: "Alex Vance", email: "ALEX@northstar.studio", workspaceName: "  Northstar Studio  ", tagline: "Second studio" });
+
+    expect(created.role).toBe("owner");
+    expect(created.workspace).toMatchObject({ name: "Northstar Studio", slug: "northstar-studio-3", tagline: "Second studio" });
+    expect(created.member).toMatchObject({ name: "Alex Vance", email: "alex@northstar.studio", role: "Owner" });
+
+    const mine = await makeListMyWorkspaces(deps())(seed.demoUserId);
+    expect(mine.map((m) => m.workspace.id)).toEqual([seed.workspaces.northstar, seed.workspaces.sandbox, created.workspace.id]);
+  });
+
+  it("requires a workspace name", async () => {
+    const create = makeCreateWorkspace(deps());
+    await expect(create({ userId: seed.demoUserId, name: "Alex Vance", email: "alex@northstar.studio", workspaceName: "   " })).rejects.toBeInstanceOf(
+      InvalidWorkspaceNameError,
+    );
+    await expect(
+      create({ userId: seed.demoUserId, name: "Alex Vance", email: "alex@northstar.studio", workspaceName: "x".repeat(61) }),
+    ).rejects.toBeInstanceOf(InvalidWorkspaceNameError);
   });
 });

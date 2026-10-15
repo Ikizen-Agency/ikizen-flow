@@ -1,5 +1,6 @@
 import type { ActivityRepository } from "../../activity/application/ports";
 import type { CustomerRepository } from "../../customers/application/ports";
+import type { Notify } from "../../notifications/application/use-cases";
 import { NotFoundError, type Clock } from "../../shared-types";
 import { computeSalesKpis, countByEffectiveStatus, onTimeDeliveryRate, weeklyBilledTotals } from "../domain/metrics";
 import {
@@ -19,6 +20,8 @@ export interface SalesDeps {
   customers: CustomerRepository;
   activity: ActivityRepository;
   clock: Clock;
+  /** Optional: in-app notifications (status changes notify the order's creator). */
+  notify?: Notify;
 }
 
 export const makeListOrders =
@@ -81,7 +84,7 @@ export const makeCreateOrder =
   };
 
 export const makeChangeOrderStatus =
-  ({ orders, activity, clock }: Omit<SalesDeps, "customers">) =>
+  ({ orders, activity, clock, notify }: Omit<SalesDeps, "customers">) =>
   async (reference: string, status: OrderStatus, actorId: number | null = null) => {
     const now = clock();
     const order = await orders.findByReference(reference);
@@ -104,6 +107,16 @@ export const makeChangeOrderStatus =
       entityId: order.id,
       createdAt: now,
     });
+    if (notify) {
+      await notify({
+        recipientIds: [await activity.originatorOf("order", order.id)],
+        actorId,
+        type: "order_status",
+        title: `Order ${order.reference} is now ${ORDER_STATUS_LABELS[status]}`,
+        body: `${order.customerCompany} · ${order.title}`,
+        href: `/sales?order=${encodeURIComponent(order.reference)}`,
+      });
+    }
   };
 
 export const makeGetOrder =

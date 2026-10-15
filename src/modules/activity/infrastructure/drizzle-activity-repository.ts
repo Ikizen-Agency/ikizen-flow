@@ -1,5 +1,5 @@
 import "server-only";
-import { and, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, isNotNull } from "drizzle-orm";
 import type { Database } from "@/server/db/connect";
 import { activityEvents, members } from "@/server/db/schema";
 import type { ActivityEntityType, NewActivityEvent } from "../domain/activity";
@@ -48,5 +48,22 @@ export class DrizzleActivityRepository implements ActivityRepository {
 
   async record(event: NewActivityEvent) {
     await this.db.insert(activityEvents).values({ ...event, workspaceId: this.workspaceId, createdAt: event.createdAt ?? new Date() });
+  }
+
+  async originatorOf(entityType: ActivityEntityType, entityId: number) {
+    const [row] = await this.db
+      .select({ actorId: activityEvents.actorId })
+      .from(activityEvents)
+      .where(
+        and(
+          eq(activityEvents.workspaceId, this.workspaceId),
+          eq(activityEvents.entityType, entityType),
+          eq(activityEvents.entityId, entityId),
+          isNotNull(activityEvents.actorId),
+        ),
+      )
+      .orderBy(asc(activityEvents.createdAt), asc(activityEvents.id))
+      .limit(1);
+    return row?.actorId ?? null;
   }
 }

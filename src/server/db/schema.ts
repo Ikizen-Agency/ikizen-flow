@@ -7,6 +7,8 @@ import { relations, sql } from "drizzle-orm";
 import { index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 import { ACTIVITY_CATEGORIES } from "../../modules/activity/domain/activity";
 import { CUSTOMER_STATUSES, CUSTOMER_TIERS } from "../../modules/customers/domain/customer";
+import { EMAIL_ENTITY_TYPES, EMAIL_KINDS, EMAIL_STATUSES } from "../../modules/mail/domain/email";
+import { NOTIFICATION_TYPES } from "../../modules/notifications/domain/notification";
 import { ORDER_CATEGORIES, ORDER_STATUSES, PAYMENT_TERMS } from "../../modules/sales/domain/order";
 import { TASK_PRIORITIES, TASK_STATUSES } from "../../modules/tasks/domain/task";
 import { WORKSPACE_ROLES } from "../../modules/workspaces/domain/workspace";
@@ -275,6 +277,47 @@ export const activityEvents = sqliteTable(
     createdAt: createdAt(),
   },
   (t) => [index("activity_workspace_created_idx").on(t.workspaceId, t.createdAt)],
+);
+
+/** Every email the app sends (or would send without SMTP), per workspace. */
+export const emailOutbox = sqliteTable(
+  "email_outbox",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    workspaceId: workspaceId(),
+    to: text("to").notNull(),
+    subject: text("subject").notNull(),
+    textBody: text("text_body").notNull(),
+    htmlBody: text("html_body"),
+    kind: text("kind", { enum: EMAIL_KINDS }).notNull(),
+    status: text("status", { enum: EMAIL_STATUSES }).notNull().default("queued"),
+    error: text("error"),
+    relatedEntityType: text("related_entity_type", { enum: EMAIL_ENTITY_TYPES }),
+    relatedEntityId: integer("related_entity_id"),
+    createdById: integer("created_by_id").references(() => members.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+    sentAt: integer("sent_at", { mode: "timestamp_ms" }),
+  },
+  (t) => [index("email_outbox_workspace_created_idx").on(t.workspaceId, t.createdAt), index("email_outbox_status_idx").on(t.status)],
+);
+
+/** In-app notifications for one member of a workspace. */
+export const notifications = sqliteTable(
+  "notifications",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    workspaceId: workspaceId(),
+    recipientId: integer("recipient_id")
+      .notNull()
+      .references(() => members.id, { onDelete: "cascade" }),
+    type: text("type", { enum: NOTIFICATION_TYPES }).notNull(),
+    title: text("title").notNull(),
+    body: text("body"),
+    href: text("href"),
+    readAt: integer("read_at", { mode: "timestamp_ms" }),
+    createdAt: createdAt(),
+  },
+  (t) => [index("notifications_recipient_idx").on(t.workspaceId, t.recipientId, t.readAt, t.createdAt)],
 );
 
 export const customersRelations = relations(customers, ({ many }) => ({

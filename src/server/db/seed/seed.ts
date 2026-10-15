@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { hashPassword } from "better-auth/crypto";
+import { and, asc, desc, eq } from "drizzle-orm";
 import type { ActivityCategory } from "../../../modules/activity/domain/activity";
 import type { CustomerStatus, CustomerTier } from "../../../modules/customers/domain/customer";
 import { dueDateFor, type OrderCategory, type OrderStatus, type PaymentTerms } from "../../../modules/sales/domain/order";
@@ -9,7 +10,9 @@ import {
   account,
   activityEvents,
   customers,
+  emailOutbox,
   members,
+  notifications,
   orderItems,
   orders,
   session,
@@ -114,6 +117,10 @@ export interface SeedSummary {
   activity: number;
   demoUserId: string;
   workspaces: { northstar: number; sandbox: number };
+  /** The demo user's member id in each workspace. */
+  demoMembers: { northstar: number; sandbox: number };
+  notifications: number;
+  emails: number;
 }
 
 type Lookup = Map<string, number>;
@@ -303,9 +310,64 @@ async function insertActivity(
   );
 }
 
+/** A few notifications for the demo user (two unread) and two outbox entries, pointing at real seed rows. */
+async function insertInbox(db: Database, now: Date, workspaceId: number, recipientId: number, actorId: number | null) {
+  const [task] = await db.select({ id: tasks.id, code: tasks.code, title: tasks.title }).from(tasks).where(and(eq(tasks.workspaceId, workspaceId), eq(tasks.status, "todo"))).limit(1);
+  const [order] = await db
+    .select({ reference: orders.reference, invoiceNumber: orders.invoiceNumber, title: orders.title })
+    .from(orders)
+    .where(eq(orders.workspaceId, workspaceId))
+    .orderBy(desc(orders.issueDate))
+    .limit(1);
+  const at = (hoursAgo: number) => new Date(now.getTime() - hoursAgo * HOUR);
+  const rows = [
+    task && { type: "task_assigned" as const, title: `You were assigned ${task.code}`, body: task.title, href: `/tasks?task=${task.id}`, readAt: null, createdAt: at(0.4) },
+    order && { type: "order_status" as const, title: `Order ${order.reference} is now Processing`, body: order.title, href: `/sales?order=${order.reference}`, readAt: null, createdAt: at(3) },
+    { type: "system" as const, title: "Welcome to Ikizen Flow", body: "Press Ctrl+K (or Cmd+K) to search anything in your workspace.", href: "/help", readAt: at(48), createdAt: at(72) },
+  ].filter((r) => Boolean(r)) as Array<Omit<typeof notifications.$inferInsert, "workspaceId" | "recipientId">>;
+  await db.insert(notifications).values(rows.map((r) => ({ ...r, workspaceId, recipientId })));
+
+  const [billed] = await db
+    .select({ id: orders.id, reference: orders.reference, invoiceNumber: orders.invoiceNumber, company: customers.company, email: customers.contactEmail })
+    .from(orders)
+    .innerJoin(customers, eq(customers.id, orders.customerId))
+    .where(and(eq(orders.workspaceId, workspaceId), eq(orders.status, "invoiced")))
+    .orderBy(asc(orders.dueDate))
+    .limit(1);
+  if (!billed) return { notifications: rows.length, emails: 0 };
+  const invoice = billed.invoiceNumber ?? billed.reference;
+  await db.insert(emailOutbox).values([
+    {
+      workspaceId,
+      to: billed.email,
+      subject: `Invoice ${invoice} is ready`,
+      textBody: `Hello ${billed.company},\n\nInvoice ${invoice} has been issued. Thank you for your business.`,
+      kind: "invoice",
+      status: "logged",
+      relatedEntityType: "order",
+      relatedEntityId: billed.id,
+      createdById: actorId,
+      createdAt: at(24 * 20),
+    },
+    {
+      workspaceId,
+      to: billed.email,
+      subject: `Payment reminder: invoice ${invoice}`,
+      textBody: `Hello ${billed.company},\n\nThis is a friendly reminder that invoice ${invoice} is past due.`,
+      kind: "reminder",
+      status: "logged",
+      relatedEntityType: "order",
+      relatedEntityId: billed.id,
+      createdById: actorId,
+      createdAt: at(26),
+    },
+  ]);
+  return { notifications: rows.length, emails: 2 };
+}
+
 /** Wipes every table and inserts the demo login plus two workspaces, with dates relative to `now`. */
 export async function seedDatabase(db: Database, now: Date): Promise<SeedSummary> {
-  for (const table of [activityEvents, taskSubtasks, tasks, orderItems, orders, customers, workspaceMemberships, members, workspaces]) {
+  for (const table of [notifications, emailOutbox, activityEvents, taskSubtasks, tasks, orderItems, orders, customers, workspaceMemberships, members, workspaces]) {
     await db.delete(table);
   }
   for (const table of [session, account, verification, user]) await db.delete(table);
@@ -343,7 +405,22 @@ export async function seedDatabase(db: Database, now: Date): Promise<SeedSummary
   await insertTasks(db, now, sandbox.workspaceId, sandboxCustomers, sandbox.memberId, SANDBOX_WORKSPACE.tasks);
   await insertActivity(db, now, sandbox.workspaceId, sandbox.memberId, SANDBOX_WORKSPACE.activity);
 
+  const demoMembers = { northstar: lookup(north.memberId, DEMO_USER.name, "member"), sandbox: lookup(sandbox.memberId, DEMO_USER.name, "member") };
+  const northInbox = await insertInbox(db, now, north.workspaceId, demoMembers.northstar, demoMembers.northstar);
+  await db.insert(notifications).values({
+    workspaceId: sandbox.workspaceId,
+    recipientId: demoMembers.sandbox,
+    type: "system",
+    title: "Sandbox workspace ready",
+    body: "Experiment freely: this workspace is separate from Northstar Studio.",
+    href: "/",
+    createdAt: new Date(now.getTime() - 5 * HOUR),
+  });
+
   return {
+    demoMembers,
+    notifications: northInbox.notifications + 1,
+    emails: northInbox.emails,
     members: MEMBERS.length + SANDBOX_WORKSPACE.members.length,
     customers: CUSTOMERS.length + SANDBOX_WORKSPACE.customers.length,
     orders: planned.length + SANDBOX_WORKSPACE.orders.length,

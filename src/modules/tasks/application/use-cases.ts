@@ -1,4 +1,5 @@
 import type { ActivityRepository } from "../../activity/application/ports";
+import type { Notify } from "../../notifications/application/use-cases";
 import { NotFoundError, type Clock } from "../../shared-types";
 import {
   applyTaskStatusChange,
@@ -14,6 +15,8 @@ export interface TaskDeps {
   tasks: TaskRepository;
   activity: ActivityRepository;
   clock: Clock;
+  /** Optional: in-app notifications (assignment). */
+  notify?: Notify;
 }
 
 export type TaskBoard = Record<TaskStatus, Task[]>;
@@ -31,7 +34,7 @@ export const makeGetTaskBoard =
 export type CreateTaskInput = Omit<NewTask, "code">;
 
 export const makeCreateTask =
-  ({ tasks, activity, clock }: TaskDeps) =>
+  ({ tasks, activity, clock, notify }: TaskDeps) =>
   async (input: CreateTaskInput, actorId: number | null = null) => {
     const now = clock();
     const task = await tasks.create({ ...input, code: nextTaskCode(await tasks.latestCode()) }, now);
@@ -42,6 +45,14 @@ export const makeCreateTask =
       entityType: "task",
       entityId: task.id,
       createdAt: now,
+    });
+    await notify?.({
+      recipientIds: [task.assigneeId],
+      actorId,
+      type: "task_assigned",
+      title: `You were assigned ${task.code}`,
+      body: task.title,
+      href: `/tasks?task=${task.id}`,
     });
     return task;
   };
