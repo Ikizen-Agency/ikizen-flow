@@ -68,10 +68,22 @@ Switch or create workspaces from the workspace card at the top of the sidebar. T
 | `pnpm typecheck` | `next typegen` + `tsc --noEmit` |
 | `pnpm lint` | ESLint |
 | `pnpm test` / `test:watch` | Vitest |
+| `pnpm test:e2e` | Playwright end-to-end happy path (see below) |
 | `pnpm db:generate` | Generate Drizzle migrations from the schema |
 | `pnpm db:migrate` / `db:seed` / `db:reset` | Apply migrations, seed demo data, or both from scratch |
 
 The seed uses dates relative to "now", so re-run `pnpm db:reset` to refresh due dates and trends.
+
+### End-to-end tests
+
+`e2e/happy-path.spec.ts` drives the real UI in Chromium: sign in as the demo user, add a customer, create and confirm a sale, record a payment for the full balance, move a task with the "Move to" select, and log out.
+
+```bash
+pnpm exec playwright install chromium   # once
+pnpm test:e2e
+```
+
+The Playwright `webServer` resets an isolated database (`data/e2e.db`, uploads in `data/e2e-uploads`), runs `next build` and serves the app with `next start` on port 3520 (`E2E_PORT` to change it) with a test-only `BETTER_AUTH_SECRET` and no SMTP, so your development data is never touched. Port 3520 must be free; an existing server is never reused. Google Fonts requests are aborted to keep the run offline-safe. If the bundled browser cannot be downloaded, point Playwright at a system Chromium: `PLAYWRIGHT_CHROMIUM_PATH=/usr/bin/chromium pnpm test:e2e`. Failure traces and screenshots land in `test-results/` (gitignored).
 
 ## Architecture
 
