@@ -3,6 +3,7 @@ import { ForbiddenError } from "@/modules/workspaces/domain/permissions";
 import type { Database } from "@/server/db/connect";
 import { seedDatabase, type SeedSummary } from "@/server/db/seed/seed";
 import { createTestDatabase } from "@/test/test-database";
+import { DrizzleMemberRepository } from "../../team/infrastructure/drizzle-member-repository";
 import type { Mailer } from "../application/ports";
 import { makeGetOutboxEmail, makeListOutbox, makeRetryEmail, makeSendEmail, makeSendTestEmail } from "../application/use-cases";
 import { EmailRetryError } from "../domain/email";
@@ -29,7 +30,7 @@ const mailer: Mailer = {
 };
 function deps(workspaceId = seed.workspaces.northstar) {
   const outbox = new DrizzleEmailOutbox(db, workspaceId);
-  return { outbox, mailer, clock: () => now, sendEmail: makeSendEmail({ outbox, mailer, clock: () => now }) };
+  return { outbox, mailer, clock: () => now, members: new DrizzleMemberRepository(db, workspaceId), sendEmail: makeSendEmail({ outbox, mailer, clock: () => now }) };
 }
 const admin = { role: "admin" as const, memberId: 1 };
 const member = { role: "member" as const, memberId: 1 };
@@ -45,10 +46,13 @@ describe("outbox administration", () => {
     expect(await makeGetOutboxEmail(deps(seed.workspaces.sandbox))(admin, page.items[0]!.id)).toBeNull();
   });
 
-  it("sends a test email to the given address and records the outcome", async () => {
-    const email = await makeSendTestEmail(deps())(admin, "alex@northstar.studio");
+  it("sends a test email only to the acting member's own address and records the outcome", async () => {
+    const self = { role: "admin" as const, memberId: seed.demoMembers.northstar };
+    const email = await makeSendTestEmail(deps())(self);
     expect(email).toMatchObject({ kind: "test", to: "alex@northstar.studio", status: "failed" });
-    await expect(makeSendTestEmail(deps())(member, "alex@northstar.studio")).rejects.toBeInstanceOf(ForbiddenError);
+    await expect(makeSendTestEmail(deps())({ ...self, role: "member" })).rejects.toBeInstanceOf(ForbiddenError);
+    // A member of another workspace is not found here, so nothing is sent.
+    await expect(makeSendTestEmail(deps())({ role: "admin", memberId: seed.demoMembers.sandbox })).rejects.toThrow(/not found/i);
   });
 
   it("retries failed emails only, recording the new outcome", async () => {

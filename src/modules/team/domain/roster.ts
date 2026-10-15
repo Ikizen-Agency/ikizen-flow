@@ -24,7 +24,7 @@ export class TeamRuleError extends Error {
   }
 }
 
-const LAST_OWNER = "A workspace needs at least one owner. Make someone else an owner first.";
+export const LAST_OWNER = "A workspace needs at least one owner. Make someone else an owner first.";
 
 /** Why `actor` cannot change `target` to `next` (null when allowed). */
 export function roleChangeBlockedReason(actor: TeamActor, target: RosterEntry, next: WorkspaceRole, ownerCount: number): string | null {

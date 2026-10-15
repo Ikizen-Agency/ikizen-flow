@@ -76,13 +76,23 @@ export const makeRetryEmail =
     }
   };
 
-/** "Send test email" from Settings > Email, to the signed-in member's address. */
+/** Active members of the workspace, enough to find the actor's own address. */
+export interface MemberEmailLookup {
+  findById(id: number): Promise<{ email: string } | null>;
+}
+
+/**
+ * "Send test email" from Settings > Email. The recipient is always the acting member's own address (looked up
+ * from the actor, never taken as input), so the button cannot be used to email arbitrary people.
+ */
 export const makeSendTestEmail =
-  ({ sendEmail }: { sendEmail: (email: NewOutboxEmail) => Promise<OutboxEmail> }) =>
-  async (actor: MailActor, to: string) => {
+  ({ sendEmail, members }: { sendEmail: (email: NewOutboxEmail) => Promise<OutboxEmail>; members: MemberEmailLookup }) =>
+  async (actor: MailActor) => {
     assertCan(actor.role, "mail.manage");
+    const self = await members.findById(actor.memberId);
+    if (!self) throw new NotFoundError("Member", actor.memberId);
     return sendEmail({
-      to,
+      to: self.email,
       subject: "Ikizen Flow test email",
       text: "This is a test email from Ikizen Flow. If you can read it, outgoing email works for your workspace.",
       kind: "test",

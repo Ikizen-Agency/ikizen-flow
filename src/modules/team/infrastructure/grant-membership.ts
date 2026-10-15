@@ -11,7 +11,8 @@ type Tx = Parameters<Parameters<Database["transaction"]>[0]>[0];
 /**
  * Gives a user access to a workspace inside a transaction. The member row with the same email is reused
  * (a teammate without a login, or a removed member, keeps their history) and linked to the login;
- * otherwise a new member row is created. Idempotent for the membership.
+ * otherwise a new member row is created. Idempotent for the membership: an existing membership keeps its
+ * role (never downgraded or changed here; role changes go through the guarded `setRole`).
  */
 export async function grantMembership(
   tx: Tx,
@@ -34,6 +35,6 @@ export async function grantMembership(
   await tx
     .insert(workspaceMemberships)
     .values({ workspaceId, userId, memberId: member.id, role, createdAt: now })
-    .onConflictDoUpdate({ target: [workspaceMemberships.workspaceId, workspaceMemberships.userId], set: { memberId: member.id, role } });
+    .onConflictDoUpdate({ target: [workspaceMemberships.workspaceId, workspaceMemberships.userId], set: { memberId: member.id } });
   return member;
 }

@@ -1,5 +1,6 @@
 import "server-only";
-import { and, asc, count, eq, gt, isNull, ne } from "drizzle-orm";
+import { and, asc, count, eq, gt, isNull, ne, or, sql } from "drizzle-orm";
+import { alias } from "drizzle-orm/sqlite-core";
 import type { AvatarColor } from "@/shared/domain/avatar-colors";
 import type { Database } from "@/server/db/connect";
 import { members, tasks, user, workspaceInvitations, workspaceMemberships } from "@/server/db/schema";
@@ -80,16 +81,50 @@ export class DrizzleTeamRepository implements TeamRepository {
     return this.db.transaction((tx) => grantMembership(tx, this.workspaceId, input, now));
   }
 
-  async setRole(memberId: number, role: WorkspaceRole) {
-    await this.db
-      .update(workspaceMemberships)
-      .set({ role })
-      .where(and(eq(workspaceMemberships.workspaceId, this.workspaceId), eq(workspaceMemberships.memberId, memberId)));
+  /**
+   * Row filter that keeps the last-owner rule atomic with the write: the membership matches only when it is
+   * not an owner (or stays one) or another owner remains. Evaluated in the same statement as the write, so
+   * two owners demoting or removing each other concurrently cannot both succeed.
+   */
+  private keepsAnOwner(memberId: number, nextRole: WorkspaceRole | null) {
+    const owners = alias(workspaceMemberships, "owners");
+    const otherOwners = this.db
+      .select({ value: count() })
+      .from(owners)
+      .where(and(eq(owners.workspaceId, this.workspaceId), eq(owners.role, "owner")));
+    return and(
+      eq(workspaceMemberships.workspaceId, this.workspaceId),
+      eq(workspaceMemberships.memberId, memberId),
+      nextRole === "owner" ? undefined : or(ne(workspaceMemberships.role, "owner"), gt(sql`(${otherOwners})`, 1)),
+    );
   }
 
-  remove(memberId: number, now: Date) {
-    return this.db.transaction(async (tx) => {
-      await tx.delete(workspaceMemberships).where(and(eq(workspaceMemberships.workspaceId, this.workspaceId), eq(workspaceMemberships.memberId, memberId)));
+  private async isOwner(memberId: number) {
+    const [row] = await this.db
+      .select({ role: workspaceMemberships.role })
+      .from(workspaceMemberships)
+      .where(and(eq(workspaceMemberships.workspaceId, this.workspaceId), eq(workspaceMemberships.memberId, memberId)));
+    return row?.role === "owner";
+  }
+
+  async setRole(memberId: number, role: WorkspaceRole) {
+    const updated = await this.db.update(workspaceMemberships).set({ role }).where(this.keepsAnOwner(memberId, role)).returning({ id: workspaceMemberships.id });
+    // Nothing matched: either the guard blocked it (still the only owner) or the membership is gone (no-op).
+    return updated.length === 0 && (await this.isOwner(memberId)) ? ("last_owner" as const) : ("changed" as const);
+  }
+
+  async remove(memberId: number, now: Date) {
+    const removed = await this.db.transaction(async (tx) => {
+      // The guarded delete runs first, so the last-owner check and the write are one statement.
+      const deleted = await tx.delete(workspaceMemberships).where(this.keepsAnOwner(memberId, null)).returning({ id: workspaceMemberships.id });
+      const [kept] =
+        deleted.length === 0
+          ? await tx
+              .select({ id: workspaceMemberships.id })
+              .from(workspaceMemberships)
+              .where(and(eq(workspaceMemberships.workspaceId, this.workspaceId), eq(workspaceMemberships.memberId, memberId)))
+          : [];
+      if (kept) return null;
       await tx.update(members).set({ removedAt: now }).where(and(eq(members.workspaceId, this.workspaceId), eq(members.id, memberId)));
       const unassigned = await tx
         .update(tasks)
@@ -98,6 +133,7 @@ export class DrizzleTeamRepository implements TeamRepository {
         .returning({ id: tasks.id });
       return { unassignedTasks: unassigned.length };
     });
+    return removed ?? ("last_owner" as const);
   }
 
   async updateProfile(memberId: number, { title, avatarColor }: { title: string; avatarColor: AvatarColor | null }) {

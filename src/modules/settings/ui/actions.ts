@@ -211,9 +211,9 @@ function deliveryMessage(email: OutboxEmail, what: string): SettingsActionState 
 }
 
 export async function sendTestEmailAction(): Promise<SettingsActionState> {
-  const { ctx, app, actor: who } = await actor();
+  const { app, actor: who } = await actor();
   return run("sendTestEmail", async () => {
-    const email = await app.mail.sendTest(who, ctx.user.email);
+    const email = await app.mail.sendTest(who);
     revalidateSettings();
     return deliveryMessage(email, "Test email");
   });

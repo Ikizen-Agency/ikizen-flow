@@ -16,7 +16,7 @@ import {
   type Invitation,
 } from "../domain/invitation";
 import { JOB_TITLE_MAX_LENGTH, MEMBER_NAME_MAX_LENGTH, type Member } from "../domain/member";
-import { normalizeEmail, removalBlockedReason, roleChangeBlockedReason, TeamRuleError, type TeamActor } from "../domain/roster";
+import { LAST_OWNER, normalizeEmail, removalBlockedReason, roleChangeBlockedReason, TeamRuleError, type TeamActor } from "../domain/roster";
 import type { InvitationDirectory, TeamRepository } from "./ports";
 
 export interface TeamDeps {
@@ -111,7 +111,8 @@ export const makeChangeMemberRole =
     const target = await entryOrThrow(team, memberId);
     const blocked = roleChangeBlockedReason(actor, target, role, await team.ownerCount());
     if (blocked) throw new TeamRuleError(blocked);
-    if (target.role !== role) await team.setRole(memberId, role);
+    // The count above gives the friendly early answer; the repository re-checks it atomically with the write.
+    if (target.role !== role && (await team.setRole(memberId, role)) === "last_owner") throw new TeamRuleError(LAST_OWNER);
   };
 
 /**
@@ -125,7 +126,9 @@ export const makeRemoveMember =
     const target = await entryOrThrow(team, memberId);
     const blocked = removalBlockedReason(actor, target, await team.ownerCount());
     if (blocked) throw new TeamRuleError(blocked);
-    return team.remove(memberId, clock());
+    const removed = await team.remove(memberId, clock());
+    if (removed === "last_owner") throw new TeamRuleError(LAST_OWNER);
+    return removed;
   };
 
 /** The actor's own job title and avatar colour in this workspace. */
@@ -163,7 +166,11 @@ export const makeGetInvitation =
     };
   };
 
-/** Joins the workspace with the invitation's role. Only the invited email, once, before it expires. */
+/**
+ * Joins the workspace with the invitation's role. Only the invited email, once, before it expires.
+ * Someone who is already a member is refused (`already_member`) and keeps their role; the invitation is left
+ * pending (an owner can revoke it, or it expires).
+ */
 export const makeAcceptInvitation =
   ({ invitations, clock }: { invitations: InvitationDirectory; clock: Clock }) =>
   async (token: string, user: InvitationUser) => {
@@ -171,6 +178,8 @@ export const makeAcceptInvitation =
     const { invitation, workspace } = await lookup(invitations, token);
     const blocked = acceptanceBlockedReason(invitation, user.email, now);
     if (blocked) throw blocked;
-    if (!(await invitations.accept(invitation.id, user, now))) throw new InvitationError("accepted", "This invitation has already been used.");
+    const outcome = await invitations.accept(invitation.id, user, now);
+    if (outcome === "already_used") throw new InvitationError("accepted", "This invitation has already been used.");
+    if (outcome === "already_member") throw new InvitationError("already_member", `You are already a member of ${workspace.name}.`);
     return { workspaceId: workspace.id };
   };

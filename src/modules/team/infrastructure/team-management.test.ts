@@ -189,3 +189,47 @@ describe("roles and removal", () => {
     expect(await entryOf("alex@northstar.studio")).toMatchObject({ member: { role: "Studio Director", avatarColor: "success" } });
   });
 });
+
+describe("owner guard and stale invitations", () => {
+  const entryOf = async (email: string) => (await makeListRoster(deps())()).members.find((m) => m.member.email === email)!;
+  const ownerIds = async () => (await makeListRoster(deps())()).members.filter((m) => m.role === "owner").map((m) => m.member.id);
+  /** A team repository whose owner count is read before a concurrent change landed. */
+  const staleCount = () => {
+    const { team } = deps();
+    return { team: Object.assign(Object.create(team) as typeof team, { ownerCount: async () => 2 }), clock: () => now };
+  };
+
+  it("never leaves zero owners when two owners demote each other", async () => {
+    const maya = await entryOf("maya@northstar.studio");
+    await makeChangeMemberRole(deps())(owner(), maya.member.id, "owner");
+    const results = await Promise.allSettled([
+      makeChangeMemberRole(deps())(owner(), maya.member.id, "member"),
+      makeChangeMemberRole(deps())({ memberId: maya.member.id, role: "owner" }, alex, "member"),
+    ]);
+    expect(results.filter((r) => r.status === "rejected").map((r) => String((r as PromiseRejectedResult).reason))).toEqual([expect.stringMatching(/at least one owner/)]);
+    expect(await ownerIds()).toHaveLength(1);
+  });
+
+  it("re-checks the owner count atomically when demoting or removing the last owner", async () => {
+    const [last] = await ownerIds();
+    await expect(makeChangeMemberRole(staleCount())({ memberId: -1, role: "owner" }, last!, "member")).rejects.toThrow(/at least one owner/);
+    await expect(makeRemoveMember(staleCount())({ memberId: -1, role: "owner" }, last!)).rejects.toThrow(/at least one owner/);
+    expect(await ownerIds()).toEqual([last]);
+  });
+
+  it("refuses a stale invitation for someone who is already a member and keeps their role", async () => {
+    nextToken = "D".repeat(43);
+    await makeInviteMember(deps())(owner(), { email: "kim@agency.test", role: "member" }, sender);
+    const kim = await createUser("u-kim", "Kim Ito", "kim@agency.test");
+    await deps().team.grantAccess({ userId: kim.id, name: kim.name, email: kim.email, role: "owner" }, now);
+
+    await expect(makeAcceptInvitation(deps())("D".repeat(43), kim)).rejects.toMatchObject({ reason: "already_member" });
+    expect((await entryOf("kim@agency.test")).role).toBe("owner");
+  });
+
+  it("never changes an existing membership's role when access is granted again", async () => {
+    const kim = { id: "u-kim", name: "Kim Ito", email: "kim@agency.test" };
+    await deps().team.grantAccess({ userId: kim.id, name: kim.name, email: kim.email, role: "member" }, now);
+    expect((await entryOf("kim@agency.test")).role).toBe("owner");
+  });
+});
