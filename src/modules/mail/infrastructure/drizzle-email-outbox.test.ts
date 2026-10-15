@@ -34,7 +34,7 @@ describe("drizzle email outbox", () => {
 
     expect(await outbox.findById(sent.id)).toMatchObject({ status: "sent", sentAt: now, error: null, kind: "campaign" });
     expect(await outbox.findById(failed.id)).toMatchObject({ status: "failed", sentAt: null, error: "550 mailbox unavailable" });
-    const failedOnly = await makeListOutbox({ outbox })({ status: "failed" });
+    const failedOnly = await makeListOutbox({ outbox })({ role: "owner", memberId: 1 }, { status: "failed" });
     expect(failedOnly.items.map((e) => e.to)).toEqual(["theo@polarismobility.eu"]);
   });
 

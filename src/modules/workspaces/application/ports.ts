@@ -19,7 +19,14 @@ export interface NewWorkspaceWithOwner {
 export interface WorkspaceDirectory {
   /** Memberships of a user, oldest workspace first. */
   listForUser(userId: string): Promise<WorkspaceMembership[]>;
-  slugExists(slug: string): Promise<boolean>;
+  /** True when another workspace (not `exceptId`) already uses the slug. */
+  slugExists(slug: string, exceptId?: number): Promise<boolean>;
+  findById(id: number): Promise<Workspace | null>;
+  update(id: number, changes: { name: string; slug: string; tagline: string }): Promise<Workspace>;
+  /** Deletes the workspace and all its data; returns the storage keys of its task attachments (to delete the files). */
+  delete(id: number): Promise<string[]>;
+  /** Renames the member profiles linked to a user in every workspace (the account name changed). */
+  renameUserMembers(userId: string, name: string): Promise<void>;
   /** Creates the workspace, the owner's member profile and the owner membership atomically. */
   createWithOwner(input: NewWorkspaceWithOwner, now: Date): Promise<WorkspaceMembership>;
 }

@@ -1,6 +1,17 @@
 /** Why an email was sent. Every outgoing email is recorded in the workspace outbox. */
-export const EMAIL_KINDS = ["reminder", "invoice", "campaign", "invite", "mention", "support"] as const;
+export const EMAIL_KINDS = ["reminder", "invoice", "campaign", "invite", "mention", "support", "notification", "test"] as const;
 export type EmailKind = (typeof EMAIL_KINDS)[number];
+
+export const EMAIL_KIND_LABELS: Record<EmailKind, string> = {
+  reminder: "Payment reminder",
+  invoice: "Invoice",
+  campaign: "Campaign",
+  invite: "Invitation",
+  mention: "Mention",
+  support: "Support",
+  notification: "Notification",
+  test: "Test email",
+};
 
 /**
  * Delivery state of an outbox entry:
@@ -9,6 +20,22 @@ export type EmailKind = (typeof EMAIL_KINDS)[number];
  */
 export const EMAIL_STATUSES = ["queued", "sent", "failed", "logged"] as const;
 export type EmailStatus = (typeof EMAIL_STATUSES)[number];
+
+export const EMAIL_STATUS_LABELS: Record<EmailStatus, string> = { queued: "Queued", sent: "Sent", failed: "Failed", logged: "Logged" };
+
+/** Public description of the configured transport (never includes credentials). */
+export function describeMailer(config: MailerConfig): { transport: "smtp" | "log"; from: string; host: string | null; port: number | null; secure: boolean } {
+  if (config.transport === "log") return { transport: "log", from: config.from, host: null, port: null, secure: false };
+  return { transport: "smtp", from: config.smtp.from, host: config.smtp.host, port: config.smtp.port, secure: config.smtp.secure };
+}
+
+/** Only failed deliveries can be retried. */
+export class EmailRetryError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "EmailRetryError";
+  }
+}
 
 export const EMAIL_ENTITY_TYPES = ["customer", "order", "task", "workspace"] as const;
 export type EmailEntityType = (typeof EMAIL_ENTITY_TYPES)[number];

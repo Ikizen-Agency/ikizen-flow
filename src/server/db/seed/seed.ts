@@ -8,6 +8,9 @@ import type { AttachmentStorage } from "../../../modules/tasks/application/ports
 import { validateAttachment } from "../../../modules/tasks/domain/attachment";
 import { mentionToken } from "../../../modules/tasks/domain/comment";
 import { dueDateFor, type OrderCategory, type OrderStatus, type PaymentTerms } from "../../../modules/sales/domain/order";
+import { NOTIFICATION_TYPES } from "../../../modules/notifications/domain/notification";
+import { DEFAULT_DELIVERY } from "../../../modules/notifications/domain/preferences";
+import { generateInvitationToken, hashInvitationToken, invitationExpiry } from "../../../modules/team/domain/invitation";
 import type { WorkspaceRole } from "../../../modules/workspaces/domain/workspace";
 import type { Database } from "../connect";
 import {
@@ -16,6 +19,7 @@ import {
   customers,
   emailOutbox,
   members,
+  notificationPreferences,
   notifications,
   orderItems,
   orders,
@@ -27,6 +31,7 @@ import {
   tasks,
   user,
   verification,
+  workspaceInvitations,
   workspaceMemberships,
   workspaces,
   payments,
@@ -442,6 +447,25 @@ async function insertInbox(db: Database, now: Date, workspaceId: number, recipie
   return { notifications: rows.length, emails: 2 };
 }
 
+/**
+ * Settings data for Northstar: a teammate without a login (assignable, cannot sign in), a pending invitation
+ * (its link token is random and not recoverable, like a real one) and the demo user's notification preferences
+ * stored with the defaults (in-app on, email off).
+ */
+async function insertTeamSettings(db: Database, now: Date, workspaceId: number, demoMemberId: number) {
+  await db.insert(members).values({ workspaceId, name: "Sofia Ortiz", email: "sofia@freelance.example", role: "Freelance Copywriter", createdAt: new Date(now.getTime() - 20 * DAY) });
+  await db.insert(workspaceInvitations).values({
+    workspaceId,
+    email: "priya@northstar.studio",
+    role: "member",
+    tokenHash: hashInvitationToken(generateInvitationToken()),
+    invitedById: demoMemberId,
+    expiresAt: invitationExpiry(new Date(now.getTime() - 2 * DAY)),
+    createdAt: new Date(now.getTime() - 2 * DAY),
+  });
+  await db.insert(notificationPreferences).values(NOTIFICATION_TYPES.map((type) => ({ workspaceId, memberId: demoMemberId, type, ...DEFAULT_DELIVERY })));
+}
+
 export interface SeedOptions {
   /** Where seeded attachment files are written; without it no attachments are seeded (tests). */
   attachmentStorage?: AttachmentStorage;
@@ -449,7 +473,7 @@ export interface SeedOptions {
 
 /** Wipes every table and inserts the demo login plus two workspaces, with dates relative to `now`. */
 export async function seedDatabase(db: Database, now: Date, { attachmentStorage }: SeedOptions = {}): Promise<SeedSummary> {
-  for (const table of [notifications, emailOutbox, activityEvents, taskAttachments, taskTimeEntries, taskComments, taskSubtasks, tasks, payments, orderItems, orders, customers, workspaceMemberships, members, workspaces]) {
+  for (const table of [notificationPreferences, workspaceInvitations, notifications, emailOutbox, activityEvents, taskAttachments, taskTimeEntries, taskComments, taskSubtasks, tasks, payments, orderItems, orders, customers, workspaceMemberships, members, workspaces]) {
     await db.delete(table);
   }
   for (const table of [session, account, verification, user]) await db.delete(table);
@@ -499,12 +523,14 @@ export async function seedDatabase(db: Database, now: Date, { attachmentStorage 
     createdAt: new Date(now.getTime() - 5 * HOUR),
   });
 
+  await insertTeamSettings(db, now, north.workspaceId, demoMembers.northstar);
+
   return {
     demoMembers,
     attachments,
     notifications: northInbox.notifications + 1,
     emails: northInbox.emails,
-    members: MEMBERS.length + SANDBOX_WORKSPACE.members.length,
+    members: MEMBERS.length + SANDBOX_WORKSPACE.members.length + 1,
     customers: CUSTOMERS.length + SANDBOX_WORKSPACE.customers.length,
     orders: planned.length + SANDBOX_WORKSPACE.orders.length,
     tasks: TASKS.length + SANDBOX_WORKSPACE.tasks.length,

@@ -60,7 +60,7 @@ export class DrizzleTaskRepository implements TaskRepository {
       const [row] = await this.db
         .select({ id: members.id })
         .from(members)
-        .where(and(eq(members.id, assigneeId), eq(members.workspaceId, this.workspaceId)));
+        .where(and(eq(members.id, assigneeId), eq(members.workspaceId, this.workspaceId), isNull(members.removedAt)));
       if (!row) throw new NotFoundError("Member", assigneeId);
     }
   }

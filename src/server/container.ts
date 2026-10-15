@@ -17,17 +17,20 @@ import {
   makeUpdateCustomer,
 } from "@/modules/customers/application/use-cases";
 import { DrizzleCustomerRepository } from "@/modules/customers/infrastructure/drizzle-customer-repository";
-import { makeListOutbox, makeSendEmail } from "@/modules/mail/application/use-cases";
-import { resolveMailerConfig, resolveSupportEmail } from "@/modules/mail/domain/email";
+import { makeGetOutboxEmail, makeListOutbox, makeRetryEmail, makeSendEmail, makeSendTestEmail } from "@/modules/mail/application/use-cases";
+import { describeMailer, resolveMailerConfig, resolveSupportEmail } from "@/modules/mail/domain/email";
 import { DrizzleEmailOutbox } from "@/modules/mail/infrastructure/drizzle-email-outbox";
 import { createMailer } from "@/modules/mail/infrastructure/mailers";
 import {
   makeCountUnreadNotifications,
+  makeGetNotificationPreferences,
   makeListNotifications,
   makeMarkAllNotificationsRead,
   makeMarkNotificationRead,
   makeNotify,
+  makeSaveNotificationPreferences,
 } from "@/modules/notifications/application/use-cases";
+import { DrizzleNotificationPreferenceRepository } from "@/modules/notifications/infrastructure/drizzle-notification-preference-repository";
 import {
   makeGetInvoice,
   makeGetInvoiceOverview,
@@ -84,15 +87,33 @@ import { DrizzleTaskCommentRepository } from "@/modules/tasks/infrastructure/dri
 import { DrizzleTaskTimeEntryRepository } from "@/modules/tasks/infrastructure/drizzle-task-time-entry-repository";
 import { LocalAttachmentStorage, resolveUploadsDir } from "@/modules/tasks/infrastructure/local-attachment-storage";
 import { DrizzleTaskRepository } from "@/modules/tasks/infrastructure/drizzle-task-repository";
+import { resolveAuthEnv } from "@/modules/auth/domain/auth-env";
+import {
+  makeAcceptInvitation,
+  makeAddTeammate,
+  makeChangeMemberRole,
+  makeGetInvitation,
+  makeInviteMember,
+  makeListRoster,
+  makeRemoveMember,
+  makeRevokeInvitation,
+  makeUpdateMemberProfile,
+} from "@/modules/team/application/team-use-cases";
+import { DrizzleInvitationDirectory } from "@/modules/team/infrastructure/drizzle-invitation-directory";
 import { DrizzleMemberRepository } from "@/modules/team/infrastructure/drizzle-member-repository";
-import { makeCreateWorkspace, makeListMyWorkspaces } from "@/modules/workspaces/application/use-cases";
+import { DrizzleTeamRepository } from "@/modules/team/infrastructure/drizzle-team-repository";
+import { makeCreateWorkspace, makeDeleteWorkspace, makeListMyWorkspaces, makeUpdateWorkspace } from "@/modules/workspaces/application/use-cases";
 import { DrizzleWorkspaceDirectory } from "@/modules/workspaces/infrastructure/drizzle-workspace-directory";
 import { db } from "./db/client";
 
 const clock = systemClock;
 const workspaceDirectory = new DrizzleWorkspaceDirectory(db);
+const invitationDirectory = new DrizzleInvitationDirectory(db);
 /** SMTP when `SMTP_HOST` is set, otherwise the log transport (outbox only). */
-const mailer = createMailer(resolveMailerConfig(process.env));
+const mailerConfig = resolveMailerConfig(process.env);
+const mailer = createMailer(mailerConfig);
+/** Public origin for links in emails (invitations, notifications, invoices). */
+const appBaseUrl = resolveAuthEnv(process.env).baseURL;
 /** Task attachment bytes on local disk: `UPLOADS_DIR` or `data/uploads`, one folder per workspace. */
 const attachmentStorage = new LocalAttachmentStorage(resolveUploadsDir(process.env));
 
@@ -117,15 +138,18 @@ export function forWorkspace(workspaceId: number) {
     taskTimeEntries: new DrizzleTaskTimeEntryRepository(db, workspaceId),
     activity: new DrizzleActivityRepository(db, workspaceId),
     members: new DrizzleMemberRepository(db, workspaceId),
+    team: new DrizzleTeamRepository(db, workspaceId),
+    notificationPreferences: new DrizzleNotificationPreferenceRepository(db, workspaceId),
     dashboard: new DrizzleDashboardRepository(db, workspaceId),
     notifications: new DrizzleNotificationRepository(db, workspaceId),
     outbox: new DrizzleEmailOutbox(db, workspaceId),
     search: new DrizzleSearchRepository(db, workspaceId),
   };
-  const notify = makeNotify({ notifications: repositories.notifications, clock });
   const sendEmail = makeSendEmail({ outbox: repositories.outbox, mailer, clock });
+  // In-app notifications respect each member's preferences; email-enabled types are also sent through the outbox.
+  const notify = makeNotify({ notifications: repositories.notifications, preferences: repositories.notificationPreferences, sendEmail, baseUrl: appBaseUrl, clock });
   // `notify` is an optional dependency of task, sales and dashboard use cases (they emit notifications).
-  const deps = { ...repositories, workspaceId, attachmentStorage, clock, notify, sendEmail };
+  const deps = { ...repositories, workspaceId, attachmentStorage, clock, notify, sendEmail, mailer, baseUrl: appBaseUrl };
 
   return {
     workspaceId,
@@ -194,7 +218,16 @@ export function forWorkspace(workspaceId: number) {
       deleteTimeEntry: makeDeleteTimeEntry(deps),
     },
     team: {
+      /** Active members (pickers, assignment). */
       members: () => repositories.members.list(),
+      roster: makeListRoster(deps),
+      addTeammate: makeAddTeammate(deps),
+      /** Existing users join directly; others get an emailed invite link (kind "invite"). */
+      invite: makeInviteMember(deps),
+      revokeInvitation: makeRevokeInvitation(deps),
+      changeRole: makeChangeMemberRole(deps),
+      remove: makeRemoveMember(deps),
+      updateProfile: makeUpdateMemberProfile(deps),
     },
     activity: {
       recent: makeListRecentActivity(deps),
@@ -210,12 +243,20 @@ export function forWorkspace(workspaceId: number) {
       unreadCount: makeCountUnreadNotifications(deps),
       markRead: makeMarkNotificationRead(deps),
       markAllRead: makeMarkAllNotificationsRead(deps),
+      preferences: makeGetNotificationPreferences({ preferences: repositories.notificationPreferences }),
+      savePreferences: makeSaveNotificationPreferences({ preferences: repositories.notificationPreferences }),
     },
     mail: {
       /** Persists to the outbox, then delivers (SMTP or log); returns the entry with its final status. */
       send: sendEmail,
+      /** Owners and admins only (the use cases enforce it). */
       outbox: makeListOutbox(deps),
+      get: makeGetOutboxEmail(deps),
+      retry: makeRetryEmail(deps),
+      sendTest: makeSendTestEmail(deps),
       transport: mailer.transport,
+      /** Transport, sender and SMTP host (no credentials). */
+      config: describeMailer(mailerConfig),
     },
     search: {
       global: makeGlobalSearch(deps),
@@ -230,5 +271,12 @@ export const directory = {
   clock,
   listMyWorkspaces: makeListMyWorkspaces({ workspaces: workspaceDirectory }),
   createWorkspace: makeCreateWorkspace({ workspaces: workspaceDirectory, clock }),
+  updateWorkspace: makeUpdateWorkspace({ workspaces: workspaceDirectory }),
+  /** Owners only; refuses the user's last workspace. Removes the workspace's attachment files too. */
+  deleteWorkspace: makeDeleteWorkspace({ workspaces: workspaceDirectory, attachmentStorage }),
+  renameUserMembers: (userId: string, name: string) => workspaceDirectory.renameUserMembers(userId, name),
+  invitation: makeGetInvitation({ invitations: invitationDirectory, clock }),
+  acceptInvitation: makeAcceptInvitation({ invitations: invitationDirectory, clock }),
+  baseUrl: appBaseUrl,
   supportEmail: resolveSupportEmail(process.env),
 } as const;

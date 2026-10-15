@@ -1,3 +1,4 @@
+import type { AvatarColor } from "@/shared/domain/avatar-colors";
 import { cn } from "@/shared/lib/cn";
 
 const palettes = [
@@ -6,6 +7,17 @@ const palettes = [
   "bg-tertiary-fixed text-on-tertiary-fixed-variant",
   "bg-surface-container-high text-on-surface",
 ] as const;
+
+/** Explicit colour picked by a member (Settings > Profile); otherwise the colour is derived from the name. */
+const colors: Record<AvatarColor, string> = {
+  primary: palettes[0],
+  secondary: palettes[1],
+  tertiary: palettes[2],
+  neutral: palettes[3],
+  success: "bg-success-tint text-success-strong",
+  warning: "bg-warning-tint text-warning-strong",
+  danger: "bg-danger-tint text-danger-strong",
+};
 
 export function initialsOf(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -26,6 +38,8 @@ export interface AvatarProps {
   size?: "xs" | "sm" | "md" | "lg";
   /** Rounded-square tile (companies) instead of a circle (people). */
   square?: boolean;
+  /** Chosen colour; falls back to a stable colour derived from the name. */
+  color?: AvatarColor | null;
   className?: string;
 }
 
@@ -36,7 +50,7 @@ const sizes = {
   lg: "size-12 text-headline-sm",
 };
 
-export function Avatar({ name, size = "sm", square = false, className }: AvatarProps) {
+export function Avatar({ name, size = "sm", square = false, color, className }: AvatarProps) {
   return (
     <span
       title={name}
@@ -44,7 +58,7 @@ export function Avatar({ name, size = "sm", square = false, className }: AvatarP
         "inline-flex shrink-0 items-center justify-center font-semibold",
         square ? "rounded-control" : "rounded-full",
         sizes[size],
-        paletteFor(name),
+        color ? colors[color] : paletteFor(name),
         className,
       )}
     >

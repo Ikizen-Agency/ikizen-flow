@@ -93,7 +93,7 @@ export class DrizzleNotificationRepository implements NotificationRepository {
     const rows = await this.db
       .select({ id: members.id })
       .from(members)
-      .where(and(eq(members.workspaceId, this.workspaceId), inArray(members.id, ids)));
+      .where(and(eq(members.workspaceId, this.workspaceId), inArray(members.id, ids), isNull(members.removedAt)));
     const found = new Set(rows.map((r) => r.id));
     return ids.filter((id) => found.has(id));
   }

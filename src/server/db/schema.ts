@@ -13,6 +13,7 @@ import { ORDER_CATEGORIES, ORDER_STATUSES, PAYMENT_TERMS } from "../../modules/s
 import { PAYMENT_METHODS } from "../../modules/sales/domain/payment";
 import { TASK_PRIORITIES, TASK_STATUSES } from "../../modules/tasks/domain/task";
 import { WORKSPACE_ROLES } from "../../modules/workspaces/domain/workspace";
+import { AVATAR_COLORS } from "../../shared/domain/avatar-colors";
 
 const createdAt = () =>
   integer("created_at", { mode: "timestamp_ms" })
@@ -118,6 +119,13 @@ export const members = sqliteTable(
     email: text("email").notNull(),
     /** Job title shown in the shell ("Operations Manager"). Access level lives in `workspace_memberships`. */
     role: text("role").notNull(),
+    /** Avatar colour picked in Settings > Profile (null: derived from the name). */
+    avatarColor: text("avatar_color", { enum: AVATAR_COLORS }),
+    /**
+     * Soft removal: removed members lose their membership and disappear from pickers, but stay referenced by
+     * history (activity, comments, completed tasks, payments). Re-adding the same email restores the row.
+     */
+    removedAt: integer("removed_at", { mode: "timestamp_ms" }),
     createdAt: createdAt(),
   },
   (t) => [uniqueIndex("members_workspace_email_unique").on(t.workspaceId, t.email), index("members_user_idx").on(t.userId)],
@@ -139,6 +147,39 @@ export const workspaceMemberships = sqliteTable(
     createdAt: createdAt(),
   },
   (t) => [uniqueIndex("memberships_workspace_user_unique").on(t.workspaceId, t.userId), index("memberships_user_idx").on(t.userId)],
+);
+
+/** Pending invitations to join a workspace by email. Only a SHA-256 hash of the link token is stored. */
+export const workspaceInvitations = sqliteTable(
+  "workspace_invitations",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    workspaceId: workspaceId(),
+    email: text("email").notNull(),
+    role: text("role", { enum: WORKSPACE_ROLES }).notNull().default("member"),
+    tokenHash: text("token_hash").notNull(),
+    invitedById: integer("invited_by_id").references(() => members.id, { onDelete: "set null" }),
+    expiresAt: integer("expires_at", { mode: "timestamp_ms" }).notNull(),
+    acceptedAt: integer("accepted_at", { mode: "timestamp_ms" }),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex("workspace_invitations_token_unique").on(t.tokenHash), index("workspace_invitations_workspace_idx").on(t.workspaceId, t.email)],
+);
+
+/** Per-member delivery choices for each notification type. Missing rows mean the defaults (in-app on, email off). */
+export const notificationPreferences = sqliteTable(
+  "notification_preferences",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    workspaceId: workspaceId(),
+    memberId: integer("member_id")
+      .notNull()
+      .references(() => members.id, { onDelete: "cascade" }),
+    type: text("type", { enum: NOTIFICATION_TYPES }).notNull(),
+    inApp: integer("in_app", { mode: "boolean" }).notNull().default(true),
+    email: integer("email", { mode: "boolean" }).notNull().default(false),
+  },
+  (t) => [uniqueIndex("notification_preferences_member_type_unique").on(t.memberId, t.type)],
 );
 
 export const customers = sqliteTable(
