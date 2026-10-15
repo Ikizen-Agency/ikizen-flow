@@ -1,7 +1,7 @@
 import "server-only";
 import { and, asc, desc, eq, inArray, isNull, lte, max, ne, or, sql, type AnyColumn, type SQL } from "drizzle-orm";
 import type { Database } from "@/server/db/connect";
-import { customers, members, taskSubtasks, tasks } from "@/server/db/schema";
+import { customers, members, taskComments, taskSubtasks, tasks } from "@/server/db/schema";
 import { likePattern } from "../../search/domain/search";
 import { NotFoundError } from "../../shared-types";
 import type { NewTask, Subtask, Task, TaskBoardQuery, TaskChanges, TaskRepository, TaskStatusUpdate } from "../application/ports";
@@ -25,7 +25,7 @@ const taskColumns = {
   trackedHours: tasks.trackedHours,
   blockedReason: tasks.blockedReason,
   tags: tasks.tags,
-  commentCount: tasks.commentCount,
+  commentCount: sql<number>`(select count(*) from ${taskComments} where ${taskComments.taskId} = ${tasks.id})`.mapWith(Number),
   completedAt: tasks.completedAt,
   createdAt: tasks.createdAt,
   updatedAt: tasks.updatedAt,
@@ -197,12 +197,5 @@ export class DrizzleTaskRepository implements TaskRepository {
       await tx.insert(taskSubtasks).values({ taskId, title, position: (row?.last ?? -1) + 1 });
       await tx.update(tasks).set({ updatedAt: now }).where(eq(tasks.id, taskId));
     });
-  }
-
-  async incrementCommentCount(id: number, now: Date) {
-    await this.db
-      .update(tasks)
-      .set({ commentCount: sql`${tasks.commentCount} + 1`, updatedAt: now })
-      .where(this.inWorkspace(eq(tasks.id, id)));
   }
 }

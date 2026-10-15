@@ -264,20 +264,3 @@ export const makeDeleteSubtask =
     if (!(await deps.tasks.deleteSubtask(taskId, subtaskId, now))) throw new NotFoundError("Subtask", subtaskId);
     await recordSubtaskEvent(deps, taskId, `removed checklist item ${title ?? ""}`.trim(), actorId, now);
   };
-
-/** Comments live in the activity log (shown in the task timeline) and bump the card's comment counter. */
-export const makeCommentOnTask =
-  ({ tasks, activity, clock }: TaskDeps) =>
-  async (taskId: number, body: string, actorId: number | null = null) => {
-    const now = clock();
-    if (!(await tasks.findById(taskId))) throw new NotFoundError("Task", taskId);
-    await tasks.incrementCommentCount(taskId, now);
-    await activity.record({
-      actorId,
-      message: `commented: ${body}`,
-      category: "operations",
-      entityType: "task",
-      entityId: taskId,
-      createdAt: now,
-    });
-  };

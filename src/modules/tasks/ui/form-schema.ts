@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { COMMENT_MAX_LENGTH } from "../domain/comment";
 import { BLOCKED_REASON_MAX, normalizeBlockedReason, TASK_PRIORITIES, TASK_STATUSES } from "../domain/task";
 
 const id = z.coerce.number().int().positive();
@@ -129,7 +130,13 @@ export const toggleSubtaskSchema = z.object({
 
 export const addSubtaskSchema = z.object({ taskId: id, title: z.string().trim().min(1).max(160) });
 
-export const taskCommentSchema = z.object({ taskId: id, body: z.string().trim().min(1).max(1000) });
+const commentBody = z.string().trim().min(1).max(COMMENT_MAX_LENGTH);
+
+export const taskCommentSchema = z.object({ taskId: id, body: commentBody });
+
+export const editCommentSchema = z.object({ commentId: id, body: commentBody });
+
+export const commentIdSchema = z.object({ commentId: id });
 
 export interface TaskMutationResult {
   ok: boolean;

@@ -3,7 +3,7 @@ import { DrizzleActivityRepository } from "@/modules/activity/infrastructure/dri
 import type { Database } from "@/server/db/connect";
 import { seedDatabase } from "@/server/db/seed/seed";
 import { createTestDatabase } from "@/test/test-database";
-import { makeAddSubtask, makeCommentOnTask, makeGetTaskDetail, makeMoveTask, makeToggleSubtask } from "../application/use-cases";
+import { makeAddSubtask, makeGetTaskDetail, makeMoveTask, makeToggleSubtask } from "../application/use-cases";
 import { DrizzleTaskRepository } from "./drizzle-task-repository";
 
 const now = new Date("2026-10-14T12:00:00Z");
@@ -48,16 +48,14 @@ describe("task detail use cases", () => {
     await expect(makeToggleSubtask(deps())(other.id, target.id, false)).rejects.toThrow(/not found/i);
   });
 
-  it("records comments and moves in the task timeline", async () => {
+  it("records moves in the task timeline", async () => {
     const repo = new DrizzleTaskRepository(db, ws);
     const [first] = await repo.listBoard({ priority: "low" });
-    await makeCommentOnTask(deps())(first!.id, "Kickoff scheduled", 1);
     await makeMoveTask(deps())(first!.id, "in_progress");
 
     const detail = await makeGetTaskDetail(deps())(first!.id);
-    expect(detail?.task.commentCount).toBe(first!.commentCount + 1);
     expect(detail?.task.status).toBe("in_progress");
-    expect(detail?.activity.map((a) => a.message)).toEqual([expect.stringMatching(/^moved /), "commented: Kickoff scheduled"]);
+    expect(detail?.activity[0]?.message).toMatch(/^moved /);
     expect(await makeGetTaskDetail(deps())(999_999)).toBeNull();
   });
 });

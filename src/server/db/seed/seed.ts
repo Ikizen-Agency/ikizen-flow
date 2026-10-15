@@ -4,6 +4,7 @@ import { hashPassword } from "better-auth/crypto";
 import { and, asc, desc, eq } from "drizzle-orm";
 import type { ActivityCategory } from "../../../modules/activity/domain/activity";
 import type { CustomerStatus, CustomerTier } from "../../../modules/customers/domain/customer";
+import { mentionToken } from "../../../modules/tasks/domain/comment";
 import { dueDateFor, type OrderCategory, type OrderStatus, type PaymentTerms } from "../../../modules/sales/domain/order";
 import type { WorkspaceRole } from "../../../modules/workspaces/domain/workspace";
 import type { Database } from "../connect";
@@ -17,6 +18,7 @@ import {
   orderItems,
   orders,
   session,
+  taskComments,
   taskSubtasks,
   tasks,
   user,
@@ -306,7 +308,6 @@ async function insertTasks(db: Database, now: Date, workspaceId: number, custome
         trackedHours: t.trackedHours ?? 0,
         blockedReason: t.blockedReason ?? null,
         tags: t.tags ? [...t.tags] : [],
-        commentCount: t.commentCount ?? 0,
         position,
         completedAt: t.completedDaysAgo !== undefined ? new Date(now.getTime() - t.completedDaysAgo * DAY) : null,
         createdAt: new Date(now.getTime() - 14 * DAY),
@@ -315,6 +316,17 @@ async function insertTasks(db: Database, now: Date, workspaceId: number, custome
       .returning({ id: tasks.id });
     if (t.subtasks?.length) {
       await db.insert(taskSubtasks).values(t.subtasks.map(([title, done], i) => ({ taskId: task!.id, title, done, position: i })));
+    }
+    if (t.comments?.length) {
+      const withMentions = (body: string) => body.replace(/@\{([^}]+)\}/g, (_, name: string) => mentionToken({ id: lookup(memberId, name, "member"), name }));
+      await db.insert(taskComments).values(
+        t.comments.map((c) => ({
+          taskId: task!.id,
+          authorId: lookup(memberId, c.author, "member"),
+          body: withMentions(c.body),
+          createdAt: new Date(now.getTime() - c.hoursAgo * HOUR),
+        })),
+      );
     }
   }
 }
@@ -394,7 +406,7 @@ async function insertInbox(db: Database, now: Date, workspaceId: number, recipie
 
 /** Wipes every table and inserts the demo login plus two workspaces, with dates relative to `now`. */
 export async function seedDatabase(db: Database, now: Date): Promise<SeedSummary> {
-  for (const table of [notifications, emailOutbox, activityEvents, taskSubtasks, tasks, payments, orderItems, orders, customers, workspaceMemberships, members, workspaces]) {
+  for (const table of [notifications, emailOutbox, activityEvents, taskComments, taskSubtasks, tasks, payments, orderItems, orders, customers, workspaceMemberships, members, workspaces]) {
     await db.delete(table);
   }
   for (const table of [session, account, verification, user]) await db.delete(table);

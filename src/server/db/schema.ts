@@ -260,7 +260,6 @@ export const tasks = sqliteTable(
     trackedHours: integer("tracked_hours").notNull().default(0),
     blockedReason: text("blocked_reason"),
     tags: text("tags", { mode: "json" }).$type<string[]>().notNull().default(sql`'[]'`),
-    commentCount: integer("comment_count").notNull().default(0),
     position: integer("position").notNull().default(0),
     completedAt: integer("completed_at", { mode: "timestamp_ms" }),
     createdAt: createdAt(),
@@ -286,6 +285,22 @@ export const taskSubtasks = sqliteTable(
     position: integer("position").notNull().default(0),
   },
   (t) => [index("task_subtasks_task_idx").on(t.taskId)],
+);
+
+/** Comments on a task (workspace via the task). Mentions are stored inline as `@[Name](memberId)`. */
+export const taskComments = sqliteTable(
+  "task_comments",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    taskId: integer("task_id")
+      .notNull()
+      .references(() => tasks.id, { onDelete: "cascade" }),
+    authorId: integer("author_id").references(() => members.id, { onDelete: "set null" }),
+    body: text("body").notNull(),
+    createdAt: createdAt(),
+    editedAt: integer("edited_at", { mode: "timestamp_ms" }),
+  },
+  (t) => [index("task_comments_task_idx").on(t.taskId, t.createdAt)],
 );
 
 export const activityEvents = sqliteTable(
@@ -369,6 +384,12 @@ export const tasksRelations = relations(tasks, ({ one, many }) => ({
   customer: one(customers, { fields: [tasks.customerId], references: [customers.id] }),
   assignee: one(members, { fields: [tasks.assigneeId], references: [members.id] }),
   subtasks: many(taskSubtasks),
+  comments: many(taskComments),
+}));
+
+export const taskCommentsRelations = relations(taskComments, ({ one }) => ({
+  task: one(tasks, { fields: [taskComments.taskId], references: [tasks.id] }),
+  author: one(members, { fields: [taskComments.authorId], references: [members.id] }),
 }));
 
 export const taskSubtasksRelations = relations(taskSubtasks, ({ one }) => ({

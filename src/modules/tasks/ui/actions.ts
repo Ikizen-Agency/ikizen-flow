@@ -6,12 +6,15 @@ import { z } from "zod";
 import { getWorkspaceApp } from "@/server/request-context";
 import { NotFoundError } from "../../shared-types";
 import { TaskNotBlockedError } from "../application/use-cases";
+import { CommentPermissionError, CommentRejectedError } from "../domain/comment";
 import { BlockedReasonRequiredError, type TaskStatus } from "../domain/task";
 import {
   addSubtaskSchema,
   blockedReasonSchema,
+  commentIdSchema,
   createTaskSchema,
   deleteSubtaskSchema,
+  editCommentSchema,
   moveTaskSchema,
   renameSubtaskSchema,
   taskCommentSchema,
@@ -36,7 +39,13 @@ function textEntries(formData: FormData): Record<string, string> {
 
 /** Domain errors carry user-facing messages; anything else is logged and reported generically. */
 function failure(error: unknown, action: string): TaskMutationResult {
-  if (error instanceof NotFoundError || error instanceof BlockedReasonRequiredError || error instanceof TaskNotBlockedError) {
+  if (
+    error instanceof NotFoundError ||
+    error instanceof BlockedReasonRequiredError ||
+    error instanceof TaskNotBlockedError ||
+    error instanceof CommentRejectedError ||
+    error instanceof CommentPermissionError
+  ) {
     return { ok: false, message: error.message };
   }
   console.error(`${action} failed`, error);
@@ -186,14 +195,43 @@ export async function deleteSubtaskAction(formData: FormData): Promise<TaskMutat
   return { ok: true };
 }
 
-export async function commentOnTaskAction(_prev: TaskMutationResult, formData: FormData): Promise<TaskMutationResult> {
+const COMMENT_HINT = "Write a comment (up to 2,000 characters).";
+
+/** Comment composer: the body already carries `@[Name](memberId)` mentions (mentioned members are notified). */
+export async function addCommentAction(_prev: TaskMutationResult, formData: FormData): Promise<TaskMutationResult> {
   const { ctx, app } = await getWorkspaceApp();
   const parsed = taskCommentSchema.safeParse(textEntries(formData));
-  if (!parsed.success) return { ok: false, message: "Write a comment (up to 1,000 characters)." };
+  if (!parsed.success) return { ok: false, message: COMMENT_HINT };
   try {
-    await app.tasks.comment(parsed.data.taskId, parsed.data.body, ctx.member.id);
+    await app.tasks.addComment(parsed.data.taskId, parsed.data.body, ctx.member.id);
   } catch (error) {
-    return failure(error, "commentOnTaskAction");
+    return failure(error, "addCommentAction");
+  }
+  revalidateTasks();
+  return { ok: true };
+}
+
+export async function editCommentAction(_prev: TaskMutationResult, formData: FormData): Promise<TaskMutationResult> {
+  const { ctx, app } = await getWorkspaceApp();
+  const parsed = editCommentSchema.safeParse(textEntries(formData));
+  if (!parsed.success) return { ok: false, message: COMMENT_HINT };
+  try {
+    await app.tasks.editComment(parsed.data.commentId, parsed.data.body, ctx.member.id);
+  } catch (error) {
+    return failure(error, "editCommentAction");
+  }
+  revalidateTasks();
+  return { ok: true };
+}
+
+export async function deleteCommentAction(_prev: TaskMutationResult, formData: FormData): Promise<TaskMutationResult> {
+  const { ctx, app } = await getWorkspaceApp();
+  const parsed = commentIdSchema.safeParse(textEntries(formData));
+  if (!parsed.success) return { ok: false, message: "Invalid comment." };
+  try {
+    await app.tasks.deleteComment(parsed.data.commentId, ctx.member.id);
+  } catch (error) {
+    return failure(error, "deleteCommentAction");
   }
   revalidateTasks();
   return { ok: true };

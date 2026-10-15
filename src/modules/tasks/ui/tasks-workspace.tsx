@@ -19,7 +19,6 @@ import { TasksHeader } from "./components/tasks-header";
 
 const PATH = "/tasks";
 const INTERNAL_LABEL = "Internal Studio";
-const COMMENT_PREFIX = "commented: ";
 
 const PRIORITY_OPTIONS = TASK_PRIORITIES.map((value) => ({ value, label: TASK_PRIORITY_LABELS[value] }));
 const STATUS_OPTIONS = TASK_STATUSES.map((value) => ({ value, label: TASK_STATUS_LABELS[value] }));
@@ -55,7 +54,7 @@ export async function TasksWorkspace({ searchParams }: { searchParams: Promise<S
   const now = app.clock();
   const filters = taskFilterQuery(params);
 
-  const [all, board, members, customers, detail, editing] = await Promise.all([
+  const [all, board, members, customers, detail, editing, comments] = await Promise.all([
     app.repositories.tasks.listBoard({}),
     app.tasks.board({
       assigneeId: params.assigneeId,
@@ -68,6 +67,7 @@ export async function TasksWorkspace({ searchParams }: { searchParams: Promise<S
     app.repositories.customers.listOptions(),
     params.taskId ? app.tasks.detail(params.taskId) : Promise.resolve(null),
     params.editId ? app.repositories.tasks.findById(params.editId) : Promise.resolve(null),
+    params.taskId ? app.tasks.comments(params.taskId) : Promise.resolve([]),
   ]);
 
   const toCard = (t: Task): TaskCardModel => ({
@@ -154,11 +154,16 @@ export async function TasksWorkspace({ searchParams }: { searchParams: Promise<S
             description: detail.task.description,
             subtasks: detail.task.subtasks.map(({ id, title, done }) => ({ id, title, done })),
           }}
-          timeline={detail.activity.map((a) => {
-            const comment = a.message.startsWith(COMMENT_PREFIX);
-            const text = comment ? a.message.slice(COMMENT_PREFIX.length) : a.message.charAt(0).toUpperCase() + a.message.slice(1);
-            return { id: a.id, actor: a.actorName ?? "System", when: formatRelativeTime(a.createdAt, now), text, comment };
-          })}
+          comments={comments.map((c) => ({
+            id: c.id,
+            author: c.authorName ?? "Former member",
+            when: formatRelativeTime(c.createdAt, now),
+            edited: c.editedAt !== null,
+            body: c.body,
+            own: c.authorId === ctx.member.id,
+          }))}
+          members={members.map((m) => ({ id: m.id, name: m.name }))}
+          timeline={detail.activity.map((a) => ({ id: a.id, actor: a.actorName ?? "System", when: formatRelativeTime(a.createdAt, now), text: a.message }))}
         />
       ) : null}
 

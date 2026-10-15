@@ -63,7 +63,7 @@ describe("task mutation schemas", () => {
     expect(toggleSubtaskSchema.parse({ taskId: "1", subtaskId: "9", done: "false" }).done).toBe(false);
     expect(addSubtaskSchema.safeParse({ taskId: "1", title: "  " }).success).toBe(false);
     expect(taskCommentSchema.parse({ taskId: "1", body: "  Looks good  " })).toEqual({ taskId: 1, body: "Looks good" });
-    expect(taskCommentSchema.safeParse({ taskId: "1", body: "x".repeat(1001) }).success).toBe(false);
+    expect(taskCommentSchema.safeParse({ taskId: "1", body: "x".repeat(2001) }).success).toBe(false);
   });
 });
 

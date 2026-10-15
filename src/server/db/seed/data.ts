@@ -126,7 +126,8 @@ export interface TaskFixture {
   trackedHours?: number;
   blockedReason?: string;
   tags?: string[];
-  commentCount?: number;
+  /** Real comments; `@{Member Name}` becomes a mention token at seed time. */
+  comments?: Array<{ author: string; body: string; hoursAgo: number }>;
   /** Days ago the task was completed (completed tasks only). */
   completedDaysAgo?: number;
   subtasks?: Array<[string, boolean]>;
@@ -145,7 +146,12 @@ export const TASKS: TaskFixture[] = [
     code: "TASK-838", title: "Prepare SOC2 Compliance Evidence for BlueWave", status: "todo", priority: "high", customer: "BlueWave Logistics AG", assignee: "Alex Vance", due: [1, 17, 0], tags: ["Compliance"],
     subtasks: [["Export access review logs", true], ["Collect change management tickets", true], ["Vendor risk questionnaire", false], ["Incident response runbook", false], ["Encryption key rotation evidence", false]],
   },
-  { code: "TASK-839", title: "Deploy Staging Environment Kubernetes Cluster", status: "in_progress", priority: "high", customer: "Lumina Health Technologies", assignee: "Liam Scott", due: [14, 17, 0], commentCount: 2, tags: ["Infrastructure"] },
+  { code: "TASK-839", title: "Deploy Staging Environment Kubernetes Cluster", status: "in_progress", priority: "high", customer: "Lumina Health Technologies", assignee: "Liam Scott", due: [14, 17, 0], tags: ["Infrastructure"],
+    comments: [
+      { author: "Liam Scott", body: "Node pools are provisioned; waiting on the ingress certificates before the smoke test.", hoursAgo: 30 },
+      { author: "Elena Ramos", body: "@{Liam Scott} certificates are issued, you can run the smoke test now.", hoursAgo: 6 },
+    ],
+  },
   { code: "TASK-840", title: "Brand Guideline Approval & Asset Sign-off", status: "blocked", priority: "urgent", customer: "Hyperion Media Group", assignee: "Alex Vance", due: [-2, 17, 0], blockedReason: "Waiting on client sign-off", tags: ["Brand"] },
   { code: "TASK-841", title: "Stripe Connect Merchant Verification", status: "blocked", priority: "high", customer: "Vanguard Fintech Solutions", assignee: "Liam Scott", due: [11, 17, 0], blockedReason: "Pending Stripe review", tags: ["Payments"] },
   {
@@ -153,7 +159,13 @@ export const TASKS: TaskFixture[] = [
     title: "Deliver Q4 UX Architecture Wireframes",
     description:
       "Comprehensive interaction schematics and information architecture diagrams for Apex Digital's multi-tenant billing flow. Must validate cross-device responsiveness with their product design board before handover to frontend engineering sprint.",
-    status: "in_progress", priority: "urgent", customer: "Apex Digital Labs", assignee: "Alex Vance", due: [0, 17, 0], estimateHours: 16, trackedHours: 14, commentCount: 4, tags: ["UX"],
+    status: "in_progress", priority: "urgent", customer: "Apex Digital Labs", assignee: "Alex Vance", due: [0, 17, 0], estimateHours: 16, trackedHours: 14, tags: ["UX"],
+    comments: [
+      { author: "Maya Chen", body: "Uploaded the feedback synthesis from last quarter's interviews to the shared drive.", hoursAgo: 52 },
+      { author: "Alex Vance", body: "Checkout node tree is mapped. @{Maya Chen} can you sanity-check the subscription selector states?", hoursAgo: 26 },
+      { author: "Maya Chen", body: "Looks solid. Only the downgrade path needs a confirmation step.", hoursAgo: 20 },
+      { author: "Mira Torres", body: "@{Alex Vance} the responsive breakpoints are annotated, ready for the handover review.", hoursAgo: 2 },
+    ],
     subtasks: [
       ["Audit previous quarterly user feedback notes", true], ["Map checkout navigation node tree", true], ["Design multi-tier subscription selectors in Figma", true],
       ["Define billing state machine edge cases", true], ["Wireframe invoice history views", true], ["Wireframe seat management modal", true],

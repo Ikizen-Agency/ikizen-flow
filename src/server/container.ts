@@ -48,7 +48,6 @@ import { DrizzlePaymentRepository } from "@/modules/sales/infrastructure/drizzle
 import { systemClock } from "@/modules/shared-types";
 import {
   makeAddSubtask,
-  makeCommentOnTask,
   makeCreateTask,
   makeDeleteSubtask,
   makeDeleteTask,
@@ -61,6 +60,8 @@ import {
   makeToggleSubtask,
   makeUpdateTask,
 } from "@/modules/tasks/application/use-cases";
+import { makeAddTaskComment, makeDeleteTaskComment, makeEditTaskComment, makeListTaskComments } from "@/modules/tasks/application/comment-use-cases";
+import { DrizzleTaskCommentRepository } from "@/modules/tasks/infrastructure/drizzle-task-comment-repository";
 import { DrizzleTaskRepository } from "@/modules/tasks/infrastructure/drizzle-task-repository";
 import { DrizzleMemberRepository } from "@/modules/team/infrastructure/drizzle-member-repository";
 import { makeCreateWorkspace, makeListMyWorkspaces } from "@/modules/workspaces/application/use-cases";
@@ -86,6 +87,7 @@ export function forWorkspace(workspaceId: number) {
     orders: new DrizzleOrderRepository(db, workspaceId),
     payments: new DrizzlePaymentRepository(db, workspaceId),
     tasks: new DrizzleTaskRepository(db, workspaceId),
+    taskComments: new DrizzleTaskCommentRepository(db, workspaceId),
     activity: new DrizzleActivityRepository(db, workspaceId),
     members: new DrizzleMemberRepository(db, workspaceId),
     dashboard: new DrizzleDashboardRepository(db, workspaceId),
@@ -140,7 +142,10 @@ export function forWorkspace(workspaceId: number) {
       addSubtask: makeAddSubtask(deps),
       renameSubtask: makeRenameSubtask(deps),
       deleteSubtask: makeDeleteSubtask(deps),
-      comment: makeCommentOnTask(deps),
+      comments: makeListTaskComments(deps),
+      addComment: makeAddTaskComment(deps),
+      editComment: makeEditTaskComment(deps),
+      deleteComment: makeDeleteTaskComment(deps),
     },
     team: {
       members: () => repositories.members.list(),

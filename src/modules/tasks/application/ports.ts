@@ -95,5 +95,25 @@ export interface TaskRepository {
   /** Both return false when the subtask does not belong to the task (or the task to the workspace). */
   renameSubtask(taskId: number, subtaskId: number, title: string, now: Date): Promise<boolean>;
   deleteSubtask(taskId: number, subtaskId: number, now: Date): Promise<boolean>;
-  incrementCommentCount(id: number, now: Date): Promise<void>;
+}
+
+export interface TaskComment {
+  id: number;
+  taskId: number;
+  authorId: number | null;
+  authorName: string | null;
+  /** Stored body with inline `@[Name](memberId)` mentions. */
+  body: string;
+  createdAt: Date;
+  editedAt: Date | null;
+}
+
+/** Comments of tasks in one workspace (ids of other workspaces behave as missing). */
+export interface TaskCommentRepository {
+  listForTask(taskId: number): Promise<TaskComment[]>;
+  findById(id: number): Promise<TaskComment | null>;
+  /** Throws NotFoundError when the task is not in the workspace. */
+  create(comment: { taskId: number; authorId: number | null; body: string }, now: Date): Promise<TaskComment>;
+  update(id: number, body: string, now: Date): Promise<void>;
+  delete(id: number): Promise<void>;
 }
