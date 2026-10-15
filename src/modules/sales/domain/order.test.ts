@@ -8,6 +8,8 @@ import {
   effectiveOrderStatus,
   InvalidOrderTransitionError,
   nextOrderReference,
+  orderStatusTone,
+  overdueCutoff,
 } from "./order";
 
 const now = new Date("2026-10-14T12:00:00Z");
@@ -100,5 +102,24 @@ describe("nextOrderReference", () => {
 
   it("starts the sequence when there are no orders", () => {
     expect(nextOrderReference(null)).toBe("SL-1001");
+  });
+});
+
+describe("overdueCutoff", () => {
+  it("is the boundary used to filter overdue orders in storage", () => {
+    const cutoff = overdueCutoff(now);
+    const justBefore = new Date(cutoff.getTime() - 1);
+    expect(effectiveOrderStatus({ status: "invoiced", dueDate: justBefore }, now)).toBe("overdue");
+    expect(effectiveOrderStatus({ status: "invoiced", dueDate: cutoff }, now)).toBe("invoiced");
+  });
+});
+
+describe("orderStatusTone", () => {
+  it("maps display statuses to badge tones", () => {
+    expect(orderStatusTone("completed")).toBe("success");
+    expect(orderStatusTone("invoiced")).toBe("info");
+    expect(orderStatusTone("pending")).toBe("warning");
+    expect(orderStatusTone("overdue")).toBe("danger");
+    expect(orderStatusTone("draft")).toBe("neutral");
   });
 });

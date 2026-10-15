@@ -1,8 +1,8 @@
 import "server-only";
-import { and, asc, count, desc, eq, gte, like, lte, or, type SQL } from "drizzle-orm";
+import { and, asc, count, desc, eq, gte, inArray, like, lt, lte, or, type SQL } from "drizzle-orm";
 import type { Database } from "@/server/db/connect";
 import { customers, orderItems, orders } from "@/server/db/schema";
-import { ORDER_STATUSES, type OrderStatus } from "../domain/order";
+import { OPEN_ORDER_STATUSES, ORDER_STATUSES, overdueCutoff, type EffectiveOrderStatus, type OrderStatus } from "../domain/order";
 import type { NewOrder, Order, OrderListQuery, OrderRepository, OrderStatusChange } from "../application/ports";
 
 const orderColumns = {
@@ -25,12 +25,20 @@ const orderColumns = {
   paidAt: orders.paidAt,
 };
 
+/** SQL for a display status: overdue is derived from open status + due date, never stored. */
+function effectiveStatusFilter(status: EffectiveOrderStatus, asOf: Date): SQL {
+  const cutoff = overdueCutoff(asOf);
+  if (status === "overdue") return and(inArray(orders.status, [...OPEN_ORDER_STATUSES]), lt(orders.dueDate, cutoff))!;
+  if (OPEN_ORDER_STATUSES.includes(status)) return and(eq(orders.status, status), gte(orders.dueDate, cutoff))!;
+  return eq(orders.status, status);
+}
+
 export class DrizzleOrderRepository implements OrderRepository {
   constructor(private readonly db: Database) {}
 
-  async list({ status, customerId, search, issuedFrom, issuedTo, page = 1, pageSize = 20 }: OrderListQuery) {
+  async list({ status, asOf = new Date(), customerId, search, issuedFrom, issuedTo, page = 1, pageSize = 20 }: OrderListQuery) {
     const filters: SQL[] = [];
-    if (status) filters.push(eq(orders.status, status));
+    if (status) filters.push(effectiveStatusFilter(status, asOf));
     if (customerId) filters.push(eq(orders.customerId, customerId));
     if (issuedFrom) filters.push(gte(orders.issueDate, issuedFrom));
     if (issuedTo) filters.push(lte(orders.issueDate, issuedTo));

@@ -9,7 +9,13 @@ import {
   makeListCustomers,
 } from "@/modules/customers/application/use-cases";
 import { DrizzleCustomerRepository } from "@/modules/customers/infrastructure/drizzle-customer-repository";
-import { makeChangeOrderStatus, makeCreateOrder, makeListOrders } from "@/modules/sales/application/use-cases";
+import {
+  makeChangeOrderStatus,
+  makeCreateOrder,
+  makeGetOrder,
+  makeGetSalesOverview,
+  makeListOrders,
+} from "@/modules/sales/application/use-cases";
 import { DrizzleOrderRepository } from "@/modules/sales/infrastructure/drizzle-order-repository";
 import { systemClock } from "@/modules/shared-types";
 import { makeCreateTask, makeGetTaskBoard, makeMoveTask } from "@/modules/tasks/application/use-cases";
@@ -46,6 +52,8 @@ export const container = {
     list: makeListOrders(deps),
     create: makeCreateOrder(deps),
     changeStatus: makeChangeOrderStatus(deps),
+    get: makeGetOrder(deps),
+    overview: makeGetSalesOverview(deps),
   },
   tasks: {
     board: makeGetTaskBoard(deps),

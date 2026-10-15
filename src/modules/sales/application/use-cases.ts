@@ -1,6 +1,7 @@
 import type { ActivityRepository } from "../../activity/application/ports";
 import type { CustomerRepository } from "../../customers/application/ports";
 import { NotFoundError, type Clock } from "../../shared-types";
+import { computeSalesKpis, countByEffectiveStatus, onTimeDeliveryRate, weeklyBilledTotals } from "../domain/metrics";
 import {
   assertOrderTransition,
   computeOrderTotals,
@@ -21,9 +22,9 @@ export interface SalesDeps {
 }
 
 export const makeListOrders =
-  ({ orders }: Pick<SalesDeps, "orders">) =>
+  ({ orders, clock }: Pick<SalesDeps, "orders" | "clock">) =>
   (query: OrderListQuery = {}) =>
-    orders.list({ page: 1, pageSize: 20, ...query });
+    orders.list({ page: 1, pageSize: 20, asOf: clock(), ...query });
 
 export interface CreateOrderInput {
   customerId: number;
@@ -103,4 +104,33 @@ export const makeChangeOrderStatus =
       entityId: order.id,
       createdAt: now,
     });
+  };
+
+export const makeGetOrder =
+  ({ orders }: Pick<SalesDeps, "orders">) =>
+  (reference: string) =>
+    orders.findByReference(reference);
+
+const VELOCITY_WEEKS = 6;
+
+/** KPI tiles, register tab counts, delivery velocity and the latest active engagement. */
+export const makeGetSalesOverview =
+  ({ orders, clock }: Pick<SalesDeps, "orders" | "clock">) =>
+  async () => {
+    const now = clock();
+    const [summaries, active, latestReference] = await Promise.all([
+      orders.listSummaries(),
+      orders.list({ status: "processing", asOf: now, page: 1, pageSize: 1 }),
+      orders.latestReference(),
+    ]);
+    return {
+      now,
+      kpis: computeSalesKpis(summaries, now),
+      counts: countByEffectiveStatus(summaries, now),
+      onTimeRate: onTimeDeliveryRate(summaries),
+      weekly: weeklyBilledTotals(summaries, now, VELOCITY_WEEKS),
+      activeEngagement: active.items[0] ?? null,
+      latestReference,
+      nextReference: nextOrderReference(latestReference),
+    };
   };

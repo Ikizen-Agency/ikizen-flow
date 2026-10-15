@@ -1,5 +1,5 @@
 import { applyBasisPoints, type Cents } from "@/shared/domain/money";
-import { addDays, daysBetween } from "@/shared/domain/time";
+import { addDays, daysBetween, startOfDay } from "@/shared/domain/time";
 
 export const ORDER_STATUSES = ["draft", "pending", "processing", "invoiced", "completed", "cancelled"] as const;
 export type OrderStatus = (typeof ORDER_STATUSES)[number];
@@ -88,6 +88,27 @@ export function daysOverdue(order: DueOrder, now: Date): number {
 
 export function effectiveOrderStatus(order: DueOrder, now: Date): EffectiveOrderStatus {
   return daysOverdue(order, now) > 0 ? "overdue" : order.status;
+}
+
+/** Orders still open with a due date before this instant are overdue (used to filter in storage). */
+export function overdueCutoff(now: Date): Date {
+  return startOfDay(now);
+}
+
+export type OrderStatusTone = "success" | "warning" | "danger" | "neutral" | "info";
+
+const STATUS_TONES: Record<EffectiveOrderStatus, OrderStatusTone> = {
+  draft: "neutral",
+  pending: "warning",
+  processing: "info",
+  invoiced: "info",
+  completed: "success",
+  cancelled: "neutral",
+  overdue: "danger",
+};
+
+export function orderStatusTone(status: EffectiveOrderStatus): OrderStatusTone {
+  return STATUS_TONES[status];
 }
 
 export function dueDateFor(issueDate: Date, terms: PaymentTerms): Date {

@@ -1,6 +1,6 @@
 import type { Page, PageRequest } from "../../shared-types";
 import type { OrderSummary } from "../domain/metrics";
-import type { OrderCategory, OrderStatus, PaymentTerms } from "../domain/order";
+import type { EffectiveOrderStatus, OrderCategory, OrderStatus, PaymentTerms } from "../domain/order";
 
 export interface OrderItem {
   id: number;
@@ -38,7 +38,10 @@ export interface OrderWithItems extends Order {
 }
 
 export interface OrderListQuery extends PageRequest {
-  status?: OrderStatus;
+  /** Display status; "overdue" and open statuses are resolved against `asOf`. */
+  status?: EffectiveOrderStatus;
+  /** Reference instant for overdue derivation (defaults to now). */
+  asOf?: Date;
   customerId?: number;
   search?: string;
   issuedFrom?: Date;
