@@ -53,3 +53,19 @@ export function formatLastActivity(date: Date | null, now: Date): string {
   if (days === 1) return "Yesterday";
   return date.getUTCFullYear() === now.getUTCFullYear() ? shortDate.format(date) : longDate.format(date);
 }
+
+const ISO_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+/** Parses a `YYYY-MM-DD` calendar date (form / URL input) as UTC midnight; undefined when malformed or impossible. */
+export function parseIsoDate(value: string | undefined): Date | undefined {
+  const match = value ? ISO_DATE.exec(value) : null;
+  if (!match) return undefined;
+  const [year, month, day] = [Number(match[1]), Number(match[2]), Number(match[3])];
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day ? date : undefined;
+}
+
+/** `YYYY-MM-DD` of a UTC date, for date inputs and CSV exports. */
+export function toIsoDate(date: Date): string {
+  return date.toISOString().slice(0, 10);
+}

@@ -28,6 +28,17 @@ import {
   makeMarkNotificationRead,
   makeNotify,
 } from "@/modules/notifications/application/use-cases";
+import {
+  makeGetInvoice,
+  makeGetInvoiceOverview,
+  makeListInvoiceableOrders,
+  makeListInvoices,
+  makeSendInvoice,
+  makeSendInvoiceReminder,
+} from "@/modules/invoices/application/use-cases";
+import { DrizzleInvoiceRepository } from "@/modules/invoices/infrastructure/drizzle-invoice-repository";
+import { makeGetReport } from "@/modules/reports/application/use-cases";
+import { DrizzleReportsRepository } from "@/modules/reports/infrastructure/drizzle-reports-repository";
 import { DrizzleNotificationRepository } from "@/modules/notifications/infrastructure/drizzle-notification-repository";
 import { makeGlobalSearch } from "@/modules/search/application/use-cases";
 import { DrizzleSearchRepository } from "@/modules/search/infrastructure/drizzle-search-repository";
@@ -98,6 +109,8 @@ export function forWorkspace(workspaceId: number) {
     customers: new DrizzleCustomerRepository(db, workspaceId),
     orders: new DrizzleOrderRepository(db, workspaceId),
     payments: new DrizzlePaymentRepository(db, workspaceId),
+    invoices: new DrizzleInvoiceRepository(db, workspaceId),
+    reports: new DrizzleReportsRepository(db, workspaceId),
     tasks: new DrizzleTaskRepository(db, workspaceId),
     taskComments: new DrizzleTaskCommentRepository(db, workspaceId),
     taskAttachments: new DrizzleTaskAttachmentRepository(db, workspaceId),
@@ -142,6 +155,18 @@ export function forWorkspace(workspaceId: number) {
       payments: makeListPayments(deps),
       recordPayment: makeRecordPayment(deps),
       deletePayment: makeDeletePayment(deps),
+    },
+    invoices: {
+      list: makeListInvoices(deps),
+      overview: makeGetInvoiceOverview(deps),
+      get: makeGetInvoice(deps),
+      /** Emails the invoice (kind "invoice") to the client's billing or contact address; check the returned outbox status. */
+      send: makeSendInvoice(deps),
+      sendReminder: makeSendInvoiceReminder(deps),
+      invoiceable: makeListInvoiceableOrders(deps),
+    },
+    reports: {
+      get: makeGetReport(deps),
     },
     tasks: {
       board: makeGetTaskBoard(deps),

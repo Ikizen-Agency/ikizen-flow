@@ -49,6 +49,8 @@ export interface OrderListQuery extends PageRequest {
   search?: string;
   issuedFrom?: Date;
   issuedTo?: Date;
+  /** Only issued invoices: invoiced or completed orders with an invoice number. */
+  invoicedOnly?: boolean;
 }
 
 export interface NewOrderItem {

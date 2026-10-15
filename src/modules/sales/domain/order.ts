@@ -53,6 +53,8 @@ const TRANSITIONS: Record<OrderStatus, ReadonlyArray<OrderStatus>> = {
 
 /** Statuses where money is still expected to come in. */
 export const OPEN_ORDER_STATUSES: ReadonlyArray<OrderStatus> = ["pending", "processing", "invoiced"];
+/** Statuses of orders that carry an issued invoice (with an invoice number). */
+export const INVOICED_ORDER_STATUSES = ["invoiced", "completed"] as const satisfies ReadonlyArray<OrderStatus>;
 
 export class InvalidOrderTransitionError extends Error {
   constructor(

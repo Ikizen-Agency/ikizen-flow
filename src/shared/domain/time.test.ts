@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addDays, daysBetween, formatDate, formatLastActivity, formatRelativeTime, startOfDay, startOfQuarter } from "./time";
+import { addDays, daysBetween, formatDate, formatLastActivity, formatRelativeTime, parseIsoDate, startOfDay, startOfQuarter } from "./time";
 
 const now = new Date("2026-10-14T12:00:00Z");
 
@@ -57,5 +57,17 @@ describe("formatLastActivity", () => {
 describe("formatDate", () => {
   it("formats a UTC calendar date like the design (Oct 24, 2024)", () => {
     expect(formatDate(new Date("2024-10-24T23:30:00Z"))).toBe("Oct 24, 2024");
+  });
+});
+
+describe("parseIsoDate", () => {
+  it("parses a YYYY-MM-DD calendar date as UTC midnight", () => {
+    expect(parseIsoDate("2026-02-28")).toEqual(new Date("2026-02-28T00:00:00Z"));
+  });
+
+  it("rejects malformed or impossible dates", () => {
+    for (const value of [undefined, "", "2026-02-30", "2026-13-01", "26-01-01", "2026-01-01T00:00:00Z", "tomorrow"]) {
+      expect(parseIsoDate(value)).toBeUndefined();
+    }
   });
 });

@@ -1,8 +1,8 @@
 import "server-only";
-import { and, asc, count, desc, eq, gte, inArray, like, lt, lte, notExists, or, sql, type SQL } from "drizzle-orm";
+import { and, asc, count, desc, eq, gte, inArray, isNotNull, like, lt, lte, notExists, or, sql, type SQL } from "drizzle-orm";
 import type { Database } from "@/server/db/connect";
 import { customers, orderItems, orders, payments } from "@/server/db/schema";
-import { OPEN_ORDER_STATUSES, ORDER_STATUSES, overdueCutoff, type EffectiveOrderStatus, type OrderStatus } from "../domain/order";
+import { INVOICED_ORDER_STATUSES, OPEN_ORDER_STATUSES, ORDER_STATUSES, overdueCutoff, type EffectiveOrderStatus, type OrderStatus } from "../domain/order";
 import { NotFoundError } from "../../shared-types";
 import type { NewOrder, Order, OrderListQuery, OrderRepository, OrderStatusChange, OrderUpdate } from "../application/ports";
 
@@ -46,8 +46,9 @@ export class DrizzleOrderRepository implements OrderRepository {
     return and(eq(orders.workspaceId, this.workspaceId), ...filters);
   }
 
-  async list({ status, asOf = new Date(), customerId, search, issuedFrom, issuedTo, page = 1, pageSize = 20 }: OrderListQuery) {
+  async list({ status, asOf = new Date(), customerId, search, issuedFrom, issuedTo, invoicedOnly, page = 1, pageSize = 20 }: OrderListQuery) {
     const filters: SQL[] = [eq(orders.workspaceId, this.workspaceId)];
+    if (invoicedOnly) filters.push(isNotNull(orders.invoiceNumber), inArray(orders.status, [...INVOICED_ORDER_STATUSES]));
     if (status) filters.push(effectiveStatusFilter(status, asOf));
     if (customerId) filters.push(eq(orders.customerId, customerId));
     if (issuedFrom) filters.push(gte(orders.issueDate, issuedFrom));
