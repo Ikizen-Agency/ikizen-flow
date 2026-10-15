@@ -6,19 +6,24 @@ import { z } from "zod";
 import { getWorkspaceApp } from "@/server/request-context";
 import { NotFoundError } from "../../shared-types";
 import { TaskNotBlockedError } from "../application/use-cases";
+import { AttachmentRejectedError, MAX_ATTACHMENT_BYTES } from "../domain/attachment";
 import { CommentPermissionError, CommentRejectedError } from "../domain/comment";
+import { TimeEntryPermissionError, TimeEntryRejectedError } from "../domain/time-entry";
 import { BlockedReasonRequiredError, type TaskStatus } from "../domain/task";
 import {
   addSubtaskSchema,
+  attachmentIdSchema,
   blockedReasonSchema,
   commentIdSchema,
   createTaskSchema,
   deleteSubtaskSchema,
   editCommentSchema,
+  logTimeSchema,
   moveTaskSchema,
   renameSubtaskSchema,
   taskCommentSchema,
   taskIdSchema,
+  timeEntryIdSchema,
   toggleSubtaskSchema,
   updateTaskSchema,
   type CreateTaskState,
@@ -44,7 +49,10 @@ function failure(error: unknown, action: string): TaskMutationResult {
     error instanceof BlockedReasonRequiredError ||
     error instanceof TaskNotBlockedError ||
     error instanceof CommentRejectedError ||
-    error instanceof CommentPermissionError
+    error instanceof CommentPermissionError ||
+    error instanceof AttachmentRejectedError ||
+    error instanceof TimeEntryRejectedError ||
+    error instanceof TimeEntryPermissionError
   ) {
     return { ok: false, message: error.message };
   }
@@ -232,6 +240,62 @@ export async function deleteCommentAction(_prev: TaskMutationResult, formData: F
     await app.tasks.deleteComment(parsed.data.commentId, ctx.member.id);
   } catch (error) {
     return failure(error, "deleteCommentAction");
+  }
+  revalidateTasks();
+  return { ok: true };
+}
+
+/** Attachment upload (multipart FormData `file`): validated in the domain, stored on disk, recorded per task. */
+export async function uploadAttachmentAction(_prev: TaskMutationResult, formData: FormData): Promise<TaskMutationResult> {
+  const { ctx, app } = await getWorkspaceApp();
+  const parsed = taskIdSchema.safeParse(textEntries(formData));
+  const file = formData.get("file");
+  if (!parsed.success || !(file instanceof File)) return { ok: false, message: "Choose a file to upload." };
+  if (file.size > MAX_ATTACHMENT_BYTES) return { ok: false, message: `Files can be up to ${MAX_ATTACHMENT_BYTES / (1024 * 1024)} MB.` };
+  try {
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    await app.tasks.uploadAttachment(parsed.data.taskId, { name: file.name, size: file.size, bytes }, ctx.member.id);
+  } catch (error) {
+    return failure(error, "uploadAttachmentAction");
+  }
+  revalidateTasks();
+  return { ok: true };
+}
+
+export async function deleteAttachmentAction(_prev: TaskMutationResult, formData: FormData): Promise<TaskMutationResult> {
+  const { ctx, app } = await getWorkspaceApp();
+  const parsed = attachmentIdSchema.safeParse(textEntries(formData));
+  if (!parsed.success) return { ok: false, message: "Invalid attachment." };
+  try {
+    await app.tasks.deleteAttachment(parsed.data.attachmentId, ctx.member.id);
+  } catch (error) {
+    return failure(error, "deleteAttachmentAction");
+  }
+  revalidateTasks();
+  return { ok: true };
+}
+
+export async function logTimeAction(_prev: TaskMutationResult, formData: FormData): Promise<TaskMutationResult> {
+  const { ctx, app } = await getWorkspaceApp();
+  const parsed = logTimeSchema.safeParse(textEntries(formData));
+  if (!parsed.success) return { ok: false, message: "Enter hours like 1.5 (quarter-hour steps, up to 24)." };
+  try {
+    await app.tasks.logTime(parsed.data.taskId, { hours: parsed.data.hours, note: parsed.data.note }, ctx.member.id);
+  } catch (error) {
+    return failure(error, "logTimeAction");
+  }
+  revalidateTasks();
+  return { ok: true };
+}
+
+export async function deleteTimeEntryAction(_prev: TaskMutationResult, formData: FormData): Promise<TaskMutationResult> {
+  const { ctx, app } = await getWorkspaceApp();
+  const parsed = timeEntryIdSchema.safeParse(textEntries(formData));
+  if (!parsed.success) return { ok: false, message: "Invalid time entry." };
+  try {
+    await app.tasks.deleteTimeEntry(parsed.data.entryId, ctx.member.id);
+  } catch (error) {
+    return failure(error, "deleteTimeEntryAction");
   }
   revalidateTasks();
   return { ok: true };

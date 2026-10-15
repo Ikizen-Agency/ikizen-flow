@@ -60,8 +60,18 @@ import {
   makeToggleSubtask,
   makeUpdateTask,
 } from "@/modules/tasks/application/use-cases";
+import {
+  makeDeleteTaskAttachment,
+  makeGetAttachmentFile,
+  makeListTaskAttachments,
+  makeUploadTaskAttachment,
+} from "@/modules/tasks/application/attachment-use-cases";
+import { makeDeleteTimeEntry, makeListTimeEntries, makeLogTime } from "@/modules/tasks/application/time-use-cases";
 import { makeAddTaskComment, makeDeleteTaskComment, makeEditTaskComment, makeListTaskComments } from "@/modules/tasks/application/comment-use-cases";
+import { DrizzleTaskAttachmentRepository } from "@/modules/tasks/infrastructure/drizzle-task-attachment-repository";
 import { DrizzleTaskCommentRepository } from "@/modules/tasks/infrastructure/drizzle-task-comment-repository";
+import { DrizzleTaskTimeEntryRepository } from "@/modules/tasks/infrastructure/drizzle-task-time-entry-repository";
+import { LocalAttachmentStorage, resolveUploadsDir } from "@/modules/tasks/infrastructure/local-attachment-storage";
 import { DrizzleTaskRepository } from "@/modules/tasks/infrastructure/drizzle-task-repository";
 import { DrizzleMemberRepository } from "@/modules/team/infrastructure/drizzle-member-repository";
 import { makeCreateWorkspace, makeListMyWorkspaces } from "@/modules/workspaces/application/use-cases";
@@ -72,6 +82,8 @@ const clock = systemClock;
 const workspaceDirectory = new DrizzleWorkspaceDirectory(db);
 /** SMTP when `SMTP_HOST` is set, otherwise the log transport (outbox only). */
 const mailer = createMailer(resolveMailerConfig(process.env));
+/** Task attachment bytes on local disk: `UPLOADS_DIR` or `data/uploads`, one folder per workspace. */
+const attachmentStorage = new LocalAttachmentStorage(resolveUploadsDir(process.env));
 
 /**
  * Composition root: the only place that knows which adapters implement each port.
@@ -88,6 +100,8 @@ export function forWorkspace(workspaceId: number) {
     payments: new DrizzlePaymentRepository(db, workspaceId),
     tasks: new DrizzleTaskRepository(db, workspaceId),
     taskComments: new DrizzleTaskCommentRepository(db, workspaceId),
+    taskAttachments: new DrizzleTaskAttachmentRepository(db, workspaceId),
+    taskTimeEntries: new DrizzleTaskTimeEntryRepository(db, workspaceId),
     activity: new DrizzleActivityRepository(db, workspaceId),
     members: new DrizzleMemberRepository(db, workspaceId),
     dashboard: new DrizzleDashboardRepository(db, workspaceId),
@@ -98,7 +112,7 @@ export function forWorkspace(workspaceId: number) {
   const notify = makeNotify({ notifications: repositories.notifications, clock });
   const sendEmail = makeSendEmail({ outbox: repositories.outbox, mailer, clock });
   // `notify` is an optional dependency of task, sales and dashboard use cases (they emit notifications).
-  const deps = { ...repositories, clock, notify, sendEmail };
+  const deps = { ...repositories, workspaceId, attachmentStorage, clock, notify, sendEmail };
 
   return {
     workspaceId,
@@ -146,6 +160,13 @@ export function forWorkspace(workspaceId: number) {
       addComment: makeAddTaskComment(deps),
       editComment: makeEditTaskComment(deps),
       deleteComment: makeDeleteTaskComment(deps),
+      attachments: makeListTaskAttachments(deps),
+      uploadAttachment: makeUploadTaskAttachment(deps),
+      deleteAttachment: makeDeleteTaskAttachment(deps),
+      attachmentFile: makeGetAttachmentFile(deps),
+      timeEntries: makeListTimeEntries(deps),
+      logTime: makeLogTime(deps),
+      deleteTimeEntry: makeDeleteTimeEntry(deps),
     },
     team: {
       members: () => repositories.members.list(),

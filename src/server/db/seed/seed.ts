@@ -4,6 +4,8 @@ import { hashPassword } from "better-auth/crypto";
 import { and, asc, desc, eq } from "drizzle-orm";
 import type { ActivityCategory } from "../../../modules/activity/domain/activity";
 import type { CustomerStatus, CustomerTier } from "../../../modules/customers/domain/customer";
+import type { AttachmentStorage } from "../../../modules/tasks/application/ports";
+import { validateAttachment } from "../../../modules/tasks/domain/attachment";
 import { mentionToken } from "../../../modules/tasks/domain/comment";
 import { dueDateFor, type OrderCategory, type OrderStatus, type PaymentTerms } from "../../../modules/sales/domain/order";
 import type { WorkspaceRole } from "../../../modules/workspaces/domain/workspace";
@@ -18,7 +20,9 @@ import {
   orderItems,
   orders,
   session,
+  taskAttachments,
   taskComments,
+  taskTimeEntries,
   taskSubtasks,
   tasks,
   user,
@@ -125,6 +129,7 @@ export interface SeedSummary {
   demoMembers: { northstar: number; sandbox: number };
   notifications: number;
   emails: number;
+  attachments: number;
 }
 
 type Lookup = Map<string, number>;
@@ -283,7 +288,17 @@ async function insertOrders(
 
 type TaskSeed = Omit<TaskFixture, "assignee"> & { assignee: string | null };
 
-async function insertTasks(db: Database, now: Date, workspaceId: number, customerId: Lookup, memberId: Lookup, list: ReadonlyArray<TaskSeed>) {
+/** Inserts tasks with their checklist, comments, time entries and (when a storage is given) text attachments. */
+async function insertTasks(
+  db: Database,
+  now: Date,
+  workspaceId: number,
+  customerId: Lookup,
+  memberId: Lookup,
+  list: ReadonlyArray<TaskSeed>,
+  attachmentStorage?: AttachmentStorage,
+): Promise<number> {
+  let attachmentCount = 0;
   const localDate = ([days, hour, minute]: readonly [number, number, number]) => {
     const d = new Date(now);
     d.setDate(d.getDate() + days);
@@ -305,7 +320,6 @@ async function insertTasks(db: Database, now: Date, workspaceId: number, custome
         assigneeId: t.assignee ? lookup(memberId, t.assignee, "member") : null,
         dueAt: t.due ? localDate(t.due) : null,
         estimateHours: t.estimateHours ?? null,
-        trackedHours: t.trackedHours ?? 0,
         blockedReason: t.blockedReason ?? null,
         tags: t.tags ? [...t.tags] : [],
         position,
@@ -328,7 +342,31 @@ async function insertTasks(db: Database, now: Date, workspaceId: number, custome
         })),
       );
     }
+    if (t.timeEntries?.length) {
+      await db.insert(taskTimeEntries).values(
+        t.timeEntries.map((e) => {
+          const loggedAt = new Date(now.getTime() - e.daysAgo * DAY);
+          return { taskId: task!.id, memberId: lookup(memberId, e.member, "member"), minutes: Math.round(e.hours * 60), note: e.note, loggedAt, createdAt: loggedAt };
+        }),
+      );
+    }
+    for (const a of attachmentStorage ? (t.attachments ?? []) : []) {
+      const bytes = new TextEncoder().encode(a.content);
+      const { fileName, mimeType, sizeBytes } = validateAttachment({ name: a.fileName, size: bytes.byteLength });
+      const storageKey = await attachmentStorage!.save(workspaceId, bytes);
+      await db.insert(taskAttachments).values({
+        taskId: task!.id,
+        uploadedById: lookup(memberId, a.uploadedBy, "member"),
+        fileName,
+        mimeType,
+        sizeBytes,
+        storageKey,
+        createdAt: new Date(now.getTime() - a.daysAgo * DAY),
+      });
+      attachmentCount++;
+    }
   }
+  return attachmentCount;
 }
 
 async function insertActivity(
@@ -404,9 +442,14 @@ async function insertInbox(db: Database, now: Date, workspaceId: number, recipie
   return { notifications: rows.length, emails: 2 };
 }
 
+export interface SeedOptions {
+  /** Where seeded attachment files are written; without it no attachments are seeded (tests). */
+  attachmentStorage?: AttachmentStorage;
+}
+
 /** Wipes every table and inserts the demo login plus two workspaces, with dates relative to `now`. */
-export async function seedDatabase(db: Database, now: Date): Promise<SeedSummary> {
-  for (const table of [notifications, emailOutbox, activityEvents, taskComments, taskSubtasks, tasks, payments, orderItems, orders, customers, workspaceMemberships, members, workspaces]) {
+export async function seedDatabase(db: Database, now: Date, { attachmentStorage }: SeedOptions = {}): Promise<SeedSummary> {
+  for (const table of [notifications, emailOutbox, activityEvents, taskAttachments, taskTimeEntries, taskComments, taskSubtasks, tasks, payments, orderItems, orders, customers, workspaceMemberships, members, workspaces]) {
     await db.delete(table);
   }
   for (const table of [session, account, verification, user]) await db.delete(table);
@@ -434,7 +477,7 @@ export async function seedDatabase(db: Database, now: Date): Promise<SeedSummary
   );
   // References end at SL-1048 (the latest order in the design's sales register).
   await insertOrders(db, now, north.workspaceId, northCustomers, planned, 1048 - planned.length + 1, lookup(north.memberId, DEMO_USER.name, "member"));
-  await insertTasks(db, now, north.workspaceId, northCustomers, north.memberId, TASKS);
+  const attachments = await insertTasks(db, now, north.workspaceId, northCustomers, north.memberId, TASKS, attachmentStorage);
   await insertActivity(db, now, north.workspaceId, north.memberId, ACTIVITY);
 
   // Helix Labs Sandbox: a small second workspace (its references and invoice numbers overlap Northstar's on purpose).
@@ -458,6 +501,7 @@ export async function seedDatabase(db: Database, now: Date): Promise<SeedSummary
 
   return {
     demoMembers,
+    attachments,
     notifications: northInbox.notifications + 1,
     emails: northInbox.emails,
     members: MEMBERS.length + SANDBOX_WORKSPACE.members.length,

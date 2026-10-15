@@ -123,7 +123,10 @@ export interface TaskFixture {
   /** Due date as [days from today, local hour, minute]; null for no due date. */
   due: [number, number, number] | null;
   estimateHours?: number;
-  trackedHours?: number;
+  /** Logged time (tracked hours are derived from these entries). */
+  timeEntries?: Array<{ member: string; hours: number; note: string; daysAgo: number }>;
+  /** Text files written to the attachment storage when the seed runs with one. */
+  attachments?: Array<{ fileName: string; uploadedBy: string; content: string; daysAgo: number }>;
   blockedReason?: string;
   tags?: string[];
   /** Real comments; `@{Member Name}` becomes a mention token at seed time. */
@@ -147,6 +150,7 @@ export const TASKS: TaskFixture[] = [
     subtasks: [["Export access review logs", true], ["Collect change management tickets", true], ["Vendor risk questionnaire", false], ["Incident response runbook", false], ["Encryption key rotation evidence", false]],
   },
   { code: "TASK-839", title: "Deploy Staging Environment Kubernetes Cluster", status: "in_progress", priority: "high", customer: "Lumina Health Technologies", assignee: "Liam Scott", due: [14, 17, 0], tags: ["Infrastructure"],
+    timeEntries: [{ member: "Liam Scott", hours: 3.5, note: "Cluster provisioning and node pools", daysAgo: 2 }],
     comments: [
       { author: "Liam Scott", body: "Node pools are provisioned; waiting on the ingress certificates before the smoke test.", hoursAgo: 30 },
       { author: "Elena Ramos", body: "@{Liam Scott} certificates are issued, you can run the smoke test now.", hoursAgo: 6 },
@@ -159,7 +163,20 @@ export const TASKS: TaskFixture[] = [
     title: "Deliver Q4 UX Architecture Wireframes",
     description:
       "Comprehensive interaction schematics and information architecture diagrams for Apex Digital's multi-tenant billing flow. Must validate cross-device responsiveness with their product design board before handover to frontend engineering sprint.",
-    status: "in_progress", priority: "urgent", customer: "Apex Digital Labs", assignee: "Alex Vance", due: [0, 17, 0], estimateHours: 16, trackedHours: 14, tags: ["UX"],
+    status: "in_progress", priority: "urgent", customer: "Apex Digital Labs", assignee: "Alex Vance", due: [0, 17, 0], estimateHours: 16, tags: ["UX"],
+    timeEntries: [
+      { member: "Alex Vance", hours: 8, note: "Checkout navigation tree and subscription selectors", daysAgo: 3 },
+      { member: "Alex Vance", hours: 6, note: "Billing state machine edge cases and invoice history", daysAgo: 1 },
+    ],
+    attachments: [
+      {
+        fileName: "wireframe-handover-notes.txt",
+        uploadedBy: "Alex Vance",
+        daysAgo: 1,
+        content:
+          "Q4 UX architecture wireframes - handover notes\n\n1. Checkout navigation tree mapped (12 nodes).\n2. Subscription selector states: upgrade, downgrade (needs confirmation step), pause.\n3. Responsive breakpoints annotated for 375, 768, 1280 and 1440 px.\n",
+      },
+    ],
     comments: [
       { author: "Maya Chen", body: "Uploaded the feedback synthesis from last quarter's interviews to the shared drive.", hoursAgo: 52 },
       { author: "Alex Vance", body: "Checkout node tree is mapped. @{Maya Chen} can you sanity-check the subscription selector states?", hoursAgo: 26 },

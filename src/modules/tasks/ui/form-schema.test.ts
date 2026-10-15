@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addSubtaskSchema, createTaskSchema, moveTaskSchema, taskCommentSchema, toggleSubtaskSchema, updateTaskSchema } from "./form-schema";
+import { addSubtaskSchema, createTaskSchema, logTimeSchema, moveTaskSchema, taskCommentSchema, toggleSubtaskSchema, updateTaskSchema } from "./form-schema";
 
 describe("createTaskSchema", () => {
   it("normalizes a complete form into a task", () => {
@@ -93,5 +93,16 @@ describe("moveTaskSchema", () => {
   it("accepts an optional blocked reason", () => {
     expect(moveTaskSchema.parse({ taskId: 1, status: "blocked", blockedReason: " Vendor " })).toEqual({ taskId: 1, status: "blocked", blockedReason: "Vendor" });
     expect(moveTaskSchema.parse({ taskId: 1, status: "todo" })).toEqual({ taskId: 1, status: "todo" });
+  });
+});
+
+describe("logTimeSchema", () => {
+  it("parses decimal hours and an optional note", () => {
+    expect(logTimeSchema.parse({ taskId: "4", hours: "1.5", note: "  QA " })).toEqual({ taskId: 4, hours: 1.5, note: "QA" });
+    expect(logTimeSchema.parse({ taskId: "4", hours: "2" })).toEqual({ taskId: 4, hours: 2, note: null });
+  });
+
+  it("rejects malformed hours", () => {
+    for (const hours of ["", "abc", "-1", "1e3", "1.234"]) expect(logTimeSchema.safeParse({ taskId: "4", hours }).success).toBe(false);
   });
 });

@@ -257,7 +257,6 @@ export const tasks = sqliteTable(
     assigneeId: integer("assignee_id").references(() => members.id, { onDelete: "set null" }),
     dueAt: integer("due_at", { mode: "timestamp_ms" }),
     estimateHours: integer("estimate_hours"),
-    trackedHours: integer("tracked_hours").notNull().default(0),
     blockedReason: text("blocked_reason"),
     tags: text("tags", { mode: "json" }).$type<string[]>().notNull().default(sql`'[]'`),
     position: integer("position").notNull().default(0),
@@ -301,6 +300,41 @@ export const taskComments = sqliteTable(
     editedAt: integer("edited_at", { mode: "timestamp_ms" }),
   },
   (t) => [index("task_comments_task_idx").on(t.taskId, t.createdAt)],
+);
+
+/** Time logged against a task (workspace via the task). Tracked hours are the sum of these minutes. */
+export const taskTimeEntries = sqliteTable(
+  "task_time_entries",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    taskId: integer("task_id")
+      .notNull()
+      .references(() => tasks.id, { onDelete: "cascade" }),
+    memberId: integer("member_id").references(() => members.id, { onDelete: "set null" }),
+    minutes: integer("minutes").notNull(),
+    note: text("note"),
+    loggedAt: integer("logged_at", { mode: "timestamp_ms" }).notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [index("task_time_entries_task_idx").on(t.taskId, t.loggedAt)],
+);
+
+/** Files attached to a task; bytes live in the attachment storage under `storage_key`. */
+export const taskAttachments = sqliteTable(
+  "task_attachments",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    taskId: integer("task_id")
+      .notNull()
+      .references(() => tasks.id, { onDelete: "cascade" }),
+    uploadedById: integer("uploaded_by_id").references(() => members.id, { onDelete: "set null" }),
+    fileName: text("file_name").notNull(),
+    mimeType: text("mime_type").notNull(),
+    sizeBytes: integer("size_bytes").notNull(),
+    storageKey: text("storage_key").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [index("task_attachments_task_idx").on(t.taskId), uniqueIndex("task_attachments_storage_key_unique").on(t.storageKey)],
 );
 
 export const activityEvents = sqliteTable(
@@ -385,6 +419,18 @@ export const tasksRelations = relations(tasks, ({ one, many }) => ({
   assignee: one(members, { fields: [tasks.assigneeId], references: [members.id] }),
   subtasks: many(taskSubtasks),
   comments: many(taskComments),
+  timeEntries: many(taskTimeEntries),
+  attachments: many(taskAttachments),
+}));
+
+export const taskTimeEntriesRelations = relations(taskTimeEntries, ({ one }) => ({
+  task: one(tasks, { fields: [taskTimeEntries.taskId], references: [tasks.id] }),
+  member: one(members, { fields: [taskTimeEntries.memberId], references: [members.id] }),
+}));
+
+export const taskAttachmentsRelations = relations(taskAttachments, ({ one }) => ({
+  task: one(tasks, { fields: [taskAttachments.taskId], references: [tasks.id] }),
+  uploadedBy: one(members, { fields: [taskAttachments.uploadedById], references: [members.id] }),
 }));
 
 export const taskCommentsRelations = relations(taskComments, ({ one }) => ({

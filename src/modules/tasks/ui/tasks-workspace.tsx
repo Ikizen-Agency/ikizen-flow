@@ -6,12 +6,16 @@ import { hrefWith } from "@/shared/ui/href";
 import type { SearchParamsRecord } from "../../customers/application/list-params";
 import type { Task } from "../application/ports";
 import { parseTaskBoardParams, taskFilterQuery } from "../application/board-params";
+import { attachmentIcon, formatFileSize } from "../domain/attachment";
+import { formatDuration } from "../domain/time-entry";
 import { describeTaskDue, DUE_FILTER_LABELS, DUE_FILTERS, dueWindow, operationalKpis, summarizeBoard } from "../domain/board";
 import { compareTasksForBoard, subtaskProgress, TASK_PRIORITIES, TASK_PRIORITY_LABELS, TASK_STATUS_LABELS, TASK_STATUSES, type TaskStatus } from "../domain/task";
 import { CreateTaskDialog, EditTaskDialog, type TaskFormValues } from "./components/task-form-dialog";
 import type { TaskCardModel } from "./components/task-badges";
 import { TaskBoard } from "./components/task-board";
+import { TaskAttachments } from "./components/task-attachments";
 import { TaskDrawer } from "./components/task-drawer";
+import { TaskTimeLog } from "./components/task-time-log";
 import { TaskFilters } from "./components/task-filters";
 import { TaskKpiStrip } from "./components/task-kpi-strip";
 import { TaskList } from "./components/task-list";
@@ -23,6 +27,8 @@ const INTERNAL_LABEL = "Internal Studio";
 const PRIORITY_OPTIONS = TASK_PRIORITIES.map((value) => ({ value, label: TASK_PRIORITY_LABELS[value] }));
 const STATUS_OPTIONS = TASK_STATUSES.map((value) => ({ value, label: TASK_STATUS_LABELS[value] }));
 const DUE_OPTIONS = DUE_FILTERS.map((value) => ({ value, label: DUE_FILTER_LABELS[value] }));
+
+const ATTACHMENT_INPUT_ID = "task-attachment-file";
 
 const milestoneDate = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" });
 
@@ -54,7 +60,7 @@ export async function TasksWorkspace({ searchParams }: { searchParams: Promise<S
   const now = app.clock();
   const filters = taskFilterQuery(params);
 
-  const [all, board, members, customers, detail, editing, comments] = await Promise.all([
+  const [all, board, members, customers, detail, editing, comments, attachments, timeEntries] = await Promise.all([
     app.repositories.tasks.listBoard({}),
     app.tasks.board({
       assigneeId: params.assigneeId,
@@ -68,6 +74,8 @@ export async function TasksWorkspace({ searchParams }: { searchParams: Promise<S
     params.taskId ? app.tasks.detail(params.taskId) : Promise.resolve(null),
     params.editId ? app.repositories.tasks.findById(params.editId) : Promise.resolve(null),
     params.taskId ? app.tasks.comments(params.taskId) : Promise.resolve([]),
+    params.taskId ? app.tasks.attachments(params.taskId) : Promise.resolve([]),
+    params.taskId ? app.tasks.timeEntries(params.taskId) : Promise.resolve([]),
   ]);
 
   const toCard = (t: Task): TaskCardModel => ({
@@ -164,7 +172,38 @@ export async function TasksWorkspace({ searchParams }: { searchParams: Promise<S
           }))}
           members={members.map((m) => ({ id: m.id, name: m.name }))}
           timeline={detail.activity.map((a) => ({ id: a.id, actor: a.actorName ?? "System", when: formatRelativeTime(a.createdAt, now), text: a.message }))}
-        />
+          attachInputId={ATTACHMENT_INPUT_ID}
+        >
+          <TaskAttachments
+            key={`attachments-${detail.task.id}`}
+            taskId={detail.task.id}
+            inputId={ATTACHMENT_INPUT_ID}
+            attachments={attachments.map((a) => ({
+              id: a.id,
+              fileName: a.fileName,
+              size: formatFileSize(a.sizeBytes),
+              icon: attachmentIcon(a.mimeType),
+              uploadedBy: a.uploadedByName ?? "Former member",
+              when: formatRelativeTime(a.createdAt, now),
+              href: `/api/attachments/${a.id}`,
+            }))}
+          />
+          <TaskTimeLog
+            key={`time-${detail.task.id}`}
+            taskId={detail.task.id}
+            tracked={formatDuration(Math.round(detail.task.trackedHours * 60))}
+            estimate={detail.task.estimateHours ? `${detail.task.estimateHours}h` : null}
+            ratio={detail.task.estimateHours ? detail.task.trackedHours / detail.task.estimateHours : null}
+            entries={timeEntries.map((e) => ({
+              id: e.id,
+              member: e.memberName ?? "Former member",
+              duration: formatDuration(e.minutes),
+              note: e.note,
+              when: formatRelativeTime(e.loggedAt, now),
+              own: e.memberId === ctx.member.id,
+            }))}
+          />
+        </TaskDrawer>
       ) : null}
 
       {editing ? (

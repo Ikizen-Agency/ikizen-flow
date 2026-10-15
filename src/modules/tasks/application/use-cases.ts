@@ -12,7 +12,7 @@ import {
   type TaskPriority,
   type TaskStatus,
 } from "../domain/task";
-import type { NewTask, Task, TaskBoardQuery, TaskRepository } from "./ports";
+import type { AttachmentStorage, NewTask, Task, TaskAttachmentRepository, TaskBoardQuery, TaskRepository } from "./ports";
 
 export interface TaskDeps {
   tasks: TaskRepository;
@@ -150,11 +150,21 @@ export const makeSetBlockedReason =
     });
   };
 
+/** Deletes the task (rows cascade) and then its stored attachment files. */
 export const makeDeleteTask =
-  ({ tasks, activity, clock }: Pick<TaskDeps, "tasks" | "activity" | "clock">) =>
+  ({
+    tasks,
+    activity,
+    clock,
+    taskAttachments,
+    attachmentStorage,
+  }: Pick<TaskDeps, "tasks" | "activity" | "clock"> & { taskAttachments?: TaskAttachmentRepository; attachmentStorage?: AttachmentStorage }) =>
   async (id: number, actorId: number | null = null) => {
     const task = await tasks.findById(id);
-    if (!task || !(await tasks.delete(id))) throw new NotFoundError("Task", id);
+    if (!task) throw new NotFoundError("Task", id);
+    const storageKeys = (await taskAttachments?.storageKeysForTask(id)) ?? [];
+    if (!(await tasks.delete(id))) throw new NotFoundError("Task", id);
+    await Promise.all(storageKeys.map((key) => attachmentStorage?.remove(key)));
     await activity.record({ actorId, message: `deleted task ${task.code} ${task.title}`, category: "operations", createdAt: clock() });
     return task;
   };

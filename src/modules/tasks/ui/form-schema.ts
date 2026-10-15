@@ -142,3 +142,17 @@ export interface TaskMutationResult {
   ok: boolean;
   message?: string;
 }
+
+export const logTimeSchema = z.object({
+  taskId: id,
+  hours: z
+    .string()
+    .trim()
+    .regex(/^\d{1,2}(\.\d{1,2})?$/, "Enter hours like 1.5")
+    .transform(Number),
+  note: optionalText(200),
+});
+
+export const attachmentIdSchema = z.object({ attachmentId: id });
+
+export const timeEntryIdSchema = z.object({ entryId: id });

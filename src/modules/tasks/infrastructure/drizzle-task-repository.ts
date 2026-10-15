@@ -1,7 +1,7 @@
 import "server-only";
 import { and, asc, desc, eq, inArray, isNull, lte, max, ne, or, sql, type AnyColumn, type SQL } from "drizzle-orm";
 import type { Database } from "@/server/db/connect";
-import { customers, members, taskComments, taskSubtasks, tasks } from "@/server/db/schema";
+import { customers, members, taskComments, taskSubtasks, taskTimeEntries, tasks } from "@/server/db/schema";
 import { likePattern } from "../../search/domain/search";
 import { NotFoundError } from "../../shared-types";
 import type { NewTask, Subtask, Task, TaskBoardQuery, TaskChanges, TaskRepository, TaskStatusUpdate } from "../application/ports";
@@ -22,7 +22,7 @@ const taskColumns = {
   assigneeName: members.name,
   dueAt: tasks.dueAt,
   estimateHours: tasks.estimateHours,
-  trackedHours: tasks.trackedHours,
+  trackedHours: sql<number>`round(coalesce((select sum(${taskTimeEntries.minutes}) from ${taskTimeEntries} where ${taskTimeEntries.taskId} = ${tasks.id}), 0) / 60.0, 2)`.mapWith(Number),
   blockedReason: tasks.blockedReason,
   tags: tasks.tags,
   commentCount: sql<number>`(select count(*) from ${taskComments} where ${taskComments.taskId} = ${tasks.id})`.mapWith(Number),
