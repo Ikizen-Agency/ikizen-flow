@@ -33,7 +33,7 @@ const deps = () => ({
 
 describe("overview dashboard", () => {
   it("aggregates every widget from storage", async () => {
-    const view = await makeGetDashboard(deps())({ period: "month", metric: "gross" });
+    const view = await makeGetDashboard(deps())({ period: "month", metric: "gross", filters: {} });
     expect(view.trend.points).toHaveLength(6);
     expect(view.trend.points.some((p) => p.cents > 0)).toBe(true);
     expect(view.sales.cents).toBeGreaterThan(0);
@@ -52,20 +52,67 @@ describe("overview dashboard", () => {
   });
 
   it("switches the trend to collected cash", async () => {
-    const gross = await makeGetDashboard(deps())({ period: "month", metric: "gross" });
-    const cash = await makeGetDashboard(deps())({ period: "month", metric: "collected" });
+    const gross = await makeGetDashboard(deps())({ period: "month", metric: "gross", filters: {} });
+    const cash = await makeGetDashboard(deps())({ period: "month", metric: "collected", filters: {} });
     expect(cash.trend.points.map((p) => p.cents)).not.toEqual(gross.trend.points.map((p) => p.cents));
   });
 });
 
+describe("dashboard filters", () => {
+  const all = () => makeGetDashboard(deps())({ period: "year", metric: "gross", filters: {} });
+
+  it("limits revenue widgets to one category", async () => {
+    const full = await all();
+    const cloud = await makeGetDashboard(deps())({ period: "year", metric: "gross", filters: { category: "cloud_architecture" } });
+    expect(cloud.categories.categories.filter((c) => c.cents > 0).map((c) => c.category)).toEqual(["cloud_architecture"]);
+    expect(cloud.sales.cents).toBe(full.categories.categories.find((c) => c.category === "cloud_architecture")!.cents);
+    expect(cloud.sales.cents).toBeLessThan(full.sales.cents);
+    expect(cloud.recentOrders.every((o) => o.category === "cloud_architecture")).toBe(true);
+    expect(cloud.overdue.items.every((o) => o.category === "cloud_architecture")).toBe(true);
+  });
+
+  it("limits orders and tasks to one customer", async () => {
+    const full = await all();
+    const target = full.overdue.items[0]!;
+    const one = await makeGetDashboard(deps())({ period: "year", metric: "gross", filters: { customerId: target.customerId } });
+    expect(one.recentOrders.length).toBeGreaterThan(0);
+    expect(one.recentOrders.every((o) => o.customerId === target.customerId)).toBe(true);
+    expect(one.overdue.items.every((o) => o.customerId === target.customerId)).toBe(true);
+    expect(one.critical.items.every((t) => t.customerId === target.customerId)).toBe(true);
+    expect(one.outstanding.cents).toBeLessThanOrEqual(full.outstanding.cents);
+  });
+
+  it("limits task widgets to one assignee", async () => {
+    const full = await all();
+    const assigneeId = full.critical.items.find((t) => t.assigneeId)!.assigneeId!;
+    const mine = await makeGetDashboard(deps())({ period: "year", metric: "gross", filters: { assigneeId } });
+    expect(mine.critical.items.length).toBeGreaterThan(0);
+    expect(mine.critical.items.every((t) => t.assigneeId === assigneeId)).toBe(true);
+    expect(mine.attention.total).toBeLessThanOrEqual(full.attention.total);
+    expect(mine.sales.cents).toBe(full.sales.cents);
+  });
+});
+
 describe("payment reminders", () => {
-  it("records a billing activity for an overdue order", async () => {
-    const view = await makeGetDashboard(deps())({ period: "month", metric: "gross" });
+  it("records a billing activity and emails the customer's billing address", async () => {
+    const view = await makeGetDashboard(deps())({ period: "month", metric: "gross", filters: {} });
     const target = view.overdue.items[0]!;
-    await makeSendPaymentReminder(deps())(target.reference, null);
+    const sent: Array<{ to: string; kind: string; subject: string; text: string }> = [];
+    const sendEmail = async (email: { to: string; kind: string; subject: string; text: string }) => {
+      sent.push(email);
+      return { ...email, id: 1, status: "logged" as const, error: null } as never;
+    };
+    const customer = await new DrizzleCustomerRepository(db, ws).findById(target.customerId);
+    const result = await makeSendPaymentReminder({ ...deps(), sendEmail })(target.reference, null, { issuer: "Northstar Studio", baseUrl: "http://app.test" });
+    expect(result).toMatchObject({ company: target.customerCompany, recipient: customer!.billingEmail ?? customer!.contactEmail, email: { status: "logged" } });
+    expect(sent).toHaveLength(1);
+    expect(sent[0]).toMatchObject({ kind: "reminder", to: customer!.billingEmail ?? customer!.contactEmail });
+    expect(sent[0]!.subject).toMatch(/overdue/);
+    expect(sent[0]!.text).toContain("http://app.test/");
     const [latest] = await new DrizzleActivityRepository(db, ws).recent(1);
     expect(latest).toMatchObject({ category: "billing", entityType: "order", entityId: target.id });
     expect(latest?.message).toContain(`sent payment reminder to ${target.customerCompany}`);
+    expect(latest?.message).toContain("(logged)");
   });
 
   it("refuses reminders for orders that are not overdue or do not exist", async () => {

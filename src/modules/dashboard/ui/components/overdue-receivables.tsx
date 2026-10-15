@@ -34,14 +34,17 @@ function ReminderCard({ item }: { item: OverdueItem }) {
       </div>
       <form action={action} className="flex items-center justify-between gap-space-sm border-t border-line pt-space-sm">
         <input type="hidden" name="reference" value={item.reference} />
-        <p className="min-w-0 truncate text-body-sm text-ink-subtle">
-          {state.status === "error" ? <span className="text-danger-strong">{state.message}</span> : `Contact: ${item.contact ?? "—"}`}
+        <p className="min-w-0 truncate text-body-sm text-ink-subtle" title={item.contact ?? undefined}>
+          Contact: {item.contact ?? "—"}
         </p>
         <Button type="submit" size="sm" icon={sent ? "check" : "send"} variant={sent ? "secondary" : "primary"} disabled={pending || sent}>
           {pending ? "Sending..." : sent ? "Reminder Sent" : "Send Reminder"}
         </Button>
       </form>
-      <p className="sr-only" aria-live="polite">
+      <p
+        aria-live="polite"
+        className={state.message ? (state.status === "error" ? "text-body-sm text-danger-strong" : "text-body-sm text-success-strong") : "sr-only"}
+      >
         {state.message}
       </p>
     </article>

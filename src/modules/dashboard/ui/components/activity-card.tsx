@@ -1,7 +1,9 @@
+import Link from "next/link";
 import { Fragment } from "react";
 import { cn } from "@/shared/lib/cn";
 import { Card } from "@/shared/ui/card";
 import type { ActivityCategory } from "../../../activity/domain/activity";
+import { LiveSync } from "./live-sync";
 
 export interface ActivityItem {
   id: number;
@@ -34,17 +36,19 @@ function Message({ text }: { text: string }) {
   );
 }
 
-export function ActivityCard({ items }: { items: ReadonlyArray<ActivityItem> }) {
+/** Highlights record references ("#INV-2041") inside an activity sentence (shared with /activity). */
+export function ActivityMessage({ text }: { text: string }) {
+  return <Message text={text} />;
+}
+
+export function ActivityCard({ items, renderedAt, viewAllHref }: { items: ReadonlyArray<ActivityItem>; renderedAt: string; viewAllHref: string }) {
   return (
     <Card className="flex flex-col gap-space-md" aria-labelledby="activity-title">
       <div className="flex items-center justify-between gap-space-sm">
         <h2 id="activity-title" className="text-headline-sm text-ink">
           Recent Team Activity
         </h2>
-        <span className="flex items-center gap-1.5 text-label-sm text-ink-subtle">
-          <span className="size-1.5 animate-pulse rounded-full bg-success" aria-hidden />
-          Live Sync
-        </span>
+        <LiveSync renderedAt={renderedAt} />
       </div>
       {items.length === 0 ? (
         <p className="text-body-sm text-ink-subtle">No team activity yet.</p>
@@ -64,6 +68,9 @@ export function ActivityCard({ items }: { items: ReadonlyArray<ActivityItem> }) 
           ))}
         </ol>
       )}
+      <Link href={viewAllHref} className="self-start text-label-md text-accent hover:underline">
+        View all activity
+      </Link>
     </Card>
   );
 }

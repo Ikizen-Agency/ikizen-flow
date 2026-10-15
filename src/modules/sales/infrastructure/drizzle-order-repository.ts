@@ -46,11 +46,12 @@ export class DrizzleOrderRepository implements OrderRepository {
     return and(eq(orders.workspaceId, this.workspaceId), ...filters);
   }
 
-  async list({ status, asOf = new Date(), customerId, search, issuedFrom, issuedTo, invoicedOnly, page = 1, pageSize = 20 }: OrderListQuery) {
+  async list({ status, asOf = new Date(), customerId, category, search, issuedFrom, issuedTo, invoicedOnly, page = 1, pageSize = 20 }: OrderListQuery) {
     const filters: SQL[] = [eq(orders.workspaceId, this.workspaceId)];
     if (invoicedOnly) filters.push(isNotNull(orders.invoiceNumber), inArray(orders.status, [...INVOICED_ORDER_STATUSES]));
     if (status) filters.push(effectiveStatusFilter(status, asOf));
     if (customerId) filters.push(eq(orders.customerId, customerId));
+    if (category) filters.push(eq(orders.category, category));
     if (issuedFrom) filters.push(gte(orders.issueDate, issuedFrom));
     if (issuedTo) filters.push(lte(orders.issueDate, issuedTo));
     if (search?.trim()) {

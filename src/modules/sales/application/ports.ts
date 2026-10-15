@@ -46,6 +46,7 @@ export interface OrderListQuery extends PageRequest {
   /** Reference instant for overdue derivation (defaults to now). */
   asOf?: Date;
   customerId?: number;
+  category?: OrderCategory;
   search?: string;
   issuedFrom?: Date;
   issuedTo?: Date;

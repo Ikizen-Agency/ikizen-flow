@@ -1,22 +1,24 @@
+import Link from "next/link";
 import { connection } from "next/server";
 import { getWorkspaceApp } from "@/server/request-context";
 import { formatMoney } from "@/shared/domain/money";
 import { formatPercent } from "@/shared/domain/stats";
 import { formatDate, formatRelativeTime } from "@/shared/domain/time";
 import { CreateNewMenu } from "@/shared/shell/create-new-menu";
-import { Button } from "@/shared/ui/button";
 import { hrefWith } from "@/shared/ui/href";
+import { Icon } from "@/shared/ui/icon";
 import { PageHeader } from "@/shared/ui/page-header";
 import { ACTIVITY_CATEGORY_LABELS } from "../../activity/domain/activity";
 import type { SearchParamsRecord } from "../../customers/application/list-params";
 import { effectiveOrderStatus, ORDER_CATEGORIES, ORDER_CATEGORY_LABELS, type OrderCategory } from "../../sales/domain/order";
 import { describeTaskDue } from "../../tasks/domain/board";
 import { taskDueState, type TaskPriority } from "../../tasks/domain/task";
-import { parseDashboardParams } from "../application/params";
+import { activeFilterCount, dashboardFilterParams, parseDashboardParams } from "../application/params";
 import { DASHBOARD_PERIODS, greetingFor, periodRange, type CategoryRevenue } from "../domain/dashboard";
 import { ActivityCard } from "./components/activity-card";
 import { CategoryCard } from "./components/category-card";
 import { CriticalTasksCard, type CriticalTaskItem } from "./components/critical-tasks-card";
+import { DashboardFilters } from "./components/dashboard-filters";
 import { KpiCards } from "./components/kpi-cards";
 import { OverdueReceivables } from "./components/overdue-receivables";
 import { PeriodPicker } from "./components/period-picker";
@@ -48,10 +50,18 @@ export async function OverviewDashboard({ searchParams }: { searchParams: Promis
   await connection();
   const query = parseDashboardParams(await searchParams);
   const { ctx, app } = await getWorkspaceApp("/");
-  const view = await app.dashboard.overview(query);
+  const [view, customerOptions, memberOptions] = await Promise.all([app.dashboard.overview(query), app.repositories.customers.listOptions(), app.team.members()]);
   const { now } = view;
   const firstName = ctx.member.name.split(" ")[0] || "there";
-  const urlState = { period: query.period === "month" ? undefined : query.period, metric: query.metric === "gross" ? undefined : query.metric };
+  const baseState = { period: query.period === "month" ? undefined : query.period, metric: query.metric === "gross" ? undefined : query.metric };
+  const filterState = dashboardFilterParams(query.filters);
+  const urlState = { ...baseState, ...filterState };
+  const filterCount = activeFilterCount(query.filters);
+  const chips = [
+    query.filters.category ? { key: "category", label: ORDER_CATEGORY_LABELS[query.filters.category] } : null,
+    query.filters.customerId ? { key: "customer", label: customerOptions.find((c) => c.id === query.filters.customerId)?.company ?? "Unknown customer" } : null,
+    query.filters.assigneeId ? { key: "assignee", label: memberOptions.find((m) => m.id === query.filters.assigneeId)?.name ?? "Unknown member" } : null,
+  ].filter((c) => c !== null);
 
   const peak = view.trend.points[view.trend.peakIndex];
   const metricLabel = query.metric === "gross" ? "Gross revenue" : "Collected cash";
@@ -72,13 +82,40 @@ export async function OverviewDashboard({ searchParams }: { searchParams: Promis
                 active: p === query.period,
               }))}
             />
-            <Button variant="secondary" icon="tune" disabled title="Advanced filters are coming soon">
-              Filters
-            </Button>
+            <DashboardFilters
+              categories={ORDER_CATEGORIES.map((c) => ({ value: c, label: ORDER_CATEGORY_LABELS[c] }))}
+              customers={customerOptions}
+              members={memberOptions}
+              current={{ category: query.filters.category, customer: query.filters.customerId, assignee: query.filters.assigneeId }}
+              keep={baseState}
+              activeCount={filterCount}
+              clearHref={hrefWith(PATH, baseState)}
+            />
             <CreateNewMenu />
           </>
         }
       />
+
+      {chips.length > 0 ? (
+        <div className="-mt-space-sm flex flex-wrap items-center gap-space-xs" aria-label="Active filters">
+          <span className="text-label-sm text-ink-subtle">Filtered by</span>
+          {chips.map((chip) => (
+            <Link
+              key={chip.key}
+              href={hrefWith(PATH, urlState, { [chip.key]: undefined })}
+              scroll={false}
+              className="inline-flex items-center gap-1 rounded-full border border-primary-fixed bg-accent-tint px-2.5 py-0.5 text-label-sm text-accent hover:bg-primary-fixed"
+            >
+              {chip.label}
+              <Icon name="close" size={14} />
+              <span className="sr-only">Remove filter</span>
+            </Link>
+          ))}
+          <Link href={hrefWith(PATH, baseState)} scroll={false} className="text-label-sm text-ink-muted hover:text-ink hover:underline">
+            Clear filters
+          </Link>
+        </div>
+      ) : null}
 
       <KpiCards
         sales={{
@@ -172,6 +209,8 @@ export async function OverviewDashboard({ searchParams }: { searchParams: Promis
             })}
           />
           <ActivityCard
+            renderedAt={now.toISOString()}
+            viewAllHref="/activity"
             items={view.activity.map((a) => ({
               id: a.id,
               actor: a.actorName ?? "System",
