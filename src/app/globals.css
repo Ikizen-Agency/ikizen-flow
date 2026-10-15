@@ -202,3 +202,13 @@
 .material-symbols-outlined[data-filled="true"] {
   font-variation-settings: "FILL" 1, "wght" 400, "GRAD" 0, "opsz" 24;
 }
+
+/* Printing (invoices): the shell is hidden with `print:hidden`; print on white with a small page margin. */
+@media print {
+  @page {
+    margin: 16mm;
+  }
+  body {
+    background: #fff;
+  }
+}

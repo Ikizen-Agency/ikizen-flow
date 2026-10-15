@@ -1,14 +1,13 @@
 import type { Metadata } from "next";
-import { ComingSoon } from "@/shared/shell/coming-soon";
+import { Suspense } from "react";
+import { InvoicesWorkspace, InvoicesWorkspaceSkeleton } from "@/modules/invoices/ui/invoices-workspace";
 
 export const metadata: Metadata = { title: "Invoices" };
 
-export default function InvoicesPage() {
+export default function InvoicesPage({ searchParams }: PageProps<"/invoices">) {
   return (
-    <ComingSoon
-      title="Invoices"
-      icon="receipt_long"
-      description="Issue, track and reconcile client invoices and settlements."
-    />
+    <Suspense fallback={<InvoicesWorkspaceSkeleton />}>
+      <InvoicesWorkspace searchParams={searchParams} />
+    </Suspense>
   );
 }

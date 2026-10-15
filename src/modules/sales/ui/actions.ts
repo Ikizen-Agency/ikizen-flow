@@ -35,6 +35,8 @@ function composerErrors(error: z.ZodError): SaleFormState {
 
 function revalidateSales() {
   revalidatePath("/sales");
+  revalidatePath("/invoices", "layout");
+  revalidatePath("/reports");
   revalidatePath("/customers");
   revalidatePath("/");
 }

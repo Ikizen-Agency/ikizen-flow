@@ -1,9 +1,11 @@
 import Link from "next/link";
 import { Suspense } from "react";
 import { Logo } from "./logo";
-import { SidebarNavLink } from "./nav-link";
+import { SidebarNavLink, SidebarNavLinkView } from "./nav-link";
 import { HELP_ITEM, NAV_ITEMS } from "./navigation";
 import { SidebarUserCard, SidebarUserCardSkeleton, WorkspaceSwitcher, WorkspaceSwitcherSkeleton } from "./session-widgets";
+
+const HELP_LINK = { href: HELP_ITEM.href, label: "Documentation & Support", icon: HELP_ITEM.icon, primaryOnMobile: false };
 
 /**
  * Fixed workspace navigation.
@@ -11,7 +13,7 @@ import { SidebarUserCard, SidebarUserCardSkeleton, WorkspaceSwitcher, WorkspaceS
  */
 export function Sidebar() {
   return (
-    <aside className="fixed inset-y-0 left-0 z-50 hidden w-rail flex-col justify-between border-r border-line bg-card md:flex lg:w-sidebar">
+    <aside className="fixed inset-y-0 left-0 z-50 hidden print:hidden w-rail flex-col justify-between border-r border-line bg-card md:flex lg:w-sidebar">
       <div className="flex min-h-0 flex-1 flex-col">
         <div className="p-space-md pb-space-sm">
           <Link href="/" className="mb-space-md flex items-center justify-center gap-space-sm lg:justify-start">
@@ -24,12 +26,16 @@ export function Sidebar() {
         </div>
         <nav aria-label="Primary" className="flex-1 space-y-space-xs overflow-y-auto px-space-md py-space-xs">
           {NAV_ITEMS.map((item) => (
-            <SidebarNavLink key={item.href} item={item} />
+            <Suspense key={item.href} fallback={<SidebarNavLinkView item={item} active={false} />}>
+              <SidebarNavLink item={item} />
+            </Suspense>
           ))}
         </nav>
       </div>
       <div className="space-y-space-sm p-space-md">
-        <SidebarNavLink item={{ href: HELP_ITEM.href, label: "Documentation & Support", icon: HELP_ITEM.icon, primaryOnMobile: false }} />
+        <Suspense fallback={<SidebarNavLinkView item={HELP_LINK} active={false} />}>
+          <SidebarNavLink item={HELP_LINK} />
+        </Suspense>
         <Suspense fallback={<SidebarUserCardSkeleton />}>
           <SidebarUserCard />
         </Suspense>

@@ -7,7 +7,7 @@ import { TopbarUser, WorkspaceBreadcrumb, WorkspaceBreadcrumbSkeleton } from "./
 
 export function Topbar() {
   return (
-    <header className="fixed top-0 right-0 left-0 z-40 h-topbar border-b border-line bg-card/90 backdrop-blur-xl md:left-rail lg:left-sidebar">
+    <header className="fixed top-0 right-0 left-0 z-40 h-topbar print:hidden border-b border-line bg-card/90 backdrop-blur-xl md:left-rail lg:left-sidebar">
       <div className="flex h-full items-center justify-between gap-space-md px-space-md md:px-space-lg">
         <div className="flex min-w-0 items-center gap-space-sm">
           <span className="md:hidden">

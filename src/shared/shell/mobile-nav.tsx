@@ -34,7 +34,7 @@ export function MobileNav() {
     <>
       <nav
         aria-label="Primary"
-        className="fixed inset-x-0 bottom-0 z-50 flex h-bottom-nav border-t border-line bg-card pb-[env(safe-area-inset-bottom)] md:hidden"
+        className="fixed inset-x-0 bottom-0 z-50 flex h-bottom-nav print:hidden border-t border-line bg-card pb-[env(safe-area-inset-bottom)] md:hidden"
       >
         {primary.map((item) => {
           const active = isActive(pathname, item.href);

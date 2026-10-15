@@ -6,9 +6,8 @@ import { cn } from "@/shared/lib/cn";
 import { Icon } from "@/shared/ui/icon";
 import { isActive, type NavItem } from "./navigation";
 
-/** Sidebar link. Labels hide on the tablet icon rail (md) and show on desktop (lg). */
-export function SidebarNavLink({ item }: { item: NavItem }) {
-  const active = isActive(usePathname(), item.href);
+/** Sidebar link markup. Labels hide on the tablet icon rail (md) and show on desktop (lg). */
+export function SidebarNavLinkView({ item, active }: { item: NavItem; active: boolean }) {
   return (
     <Link
       href={item.href}
@@ -25,4 +24,12 @@ export function SidebarNavLink({ item }: { item: NavItem }) {
       <span className="hidden lg:inline">{item.label}</span>
     </Link>
   );
+}
+
+/**
+ * Sidebar link highlighted for the current route. Reading the pathname suspends on routes with dynamic params
+ * (e.g. `/invoices/[number]`), so render it inside `<Suspense>` with `SidebarNavLinkView` as the fallback.
+ */
+export function SidebarNavLink({ item }: { item: NavItem }) {
+  return <SidebarNavLinkView item={item} active={isActive(usePathname(), item.href)} />;
 }
