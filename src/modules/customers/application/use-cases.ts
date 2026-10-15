@@ -194,8 +194,17 @@ export const makeDeleteCustomers =
       if (deps.orders > 0 || deps.tasks > 0) result.skipped.push({ customer, ...deps });
       else deletable.push(customer);
     }
+    // The repository re-checks dependencies atomically; customers that gained history meanwhile are reported as skipped.
     const deletedIds = new Set(await customers.deleteMany(deletable.map((c) => c.id)));
     result.deleted = deletable.filter((c) => deletedIds.has(c.id));
+    const kept = deletable.filter((c) => !deletedIds.has(c.id));
+    if (kept.length > 0) {
+      const fresh = await customers.dependencies(kept.map((c) => c.id));
+      for (const customer of kept) {
+        const deps = fresh.get(customer.id);
+        if (deps && (deps.orders > 0 || deps.tasks > 0)) result.skipped.push({ customer, ...deps });
+      }
+    }
     const now = clock();
     for (const customer of result.deleted) {
       await activity.record({ actorId, message: `deleted client ${customer.company}`, category: "pipeline", entityType: "customer", entityId: customer.id, createdAt: now });
@@ -210,7 +219,8 @@ export const makeDeleteCustomer = (deps: CustomerDeps) => {
     const customer = await deps.customers.findById(id);
     if (!customer) throw new NotFoundError("Customer", id);
     assertCustomerDeletable(customer.company, (await deps.customers.dependencies([id])).get(id) ?? { orders: 0, tasks: 0 });
-    await deleteMany([id], actorId);
+    const { skipped } = await deleteMany([id], actorId);
+    if (skipped[0]) assertCustomerDeletable(customer.company, skipped[0]);
     return customer;
   };
 };

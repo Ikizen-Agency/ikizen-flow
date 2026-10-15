@@ -72,6 +72,6 @@ export interface CustomerRepository {
   setTier(ids: ReadonlyArray<number>, tier: CustomerTier, now: Date): Promise<number[]>;
   /** Orders and tasks referencing each of the workspace's customers among `ids`. */
   dependencies(ids: ReadonlyArray<number>): Promise<Map<number, CustomerDependencies>>;
-  /** Hard delete of the workspace's customers among `ids`; returns the ids deleted. */
+  /** Atomic hard delete of the workspace's customers among `ids` that have no orders or tasks; returns the ids deleted. */
   deleteMany(ids: ReadonlyArray<number>): Promise<number[]>;
 }

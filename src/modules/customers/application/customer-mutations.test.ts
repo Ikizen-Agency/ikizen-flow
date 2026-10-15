@@ -3,6 +3,7 @@ import { DrizzleActivityRepository } from "@/modules/activity/infrastructure/dri
 import type { NewOutboxEmail } from "@/modules/mail/application/ports";
 import type { OutboxEmail } from "@/modules/mail/domain/email";
 import type { Database } from "@/server/db/connect";
+import { tasks } from "@/server/db/schema";
 import { seedDatabase } from "@/server/db/seed/seed";
 import { createTestDatabase } from "@/test/test-database";
 import { NotFoundError } from "../../shared-types";
@@ -157,6 +158,35 @@ describe("deleting", () => {
     expect(result.skipped.map((s) => s.customer.id)).toEqual([apex]);
     expect(result.skipped[0]!.orders).toBeGreaterThan(0);
     expect(await deps(sandboxWs).customers.findById(foreign)).not.toBeNull();
+  });
+
+  it("re-checks dependencies atomically at delete time (history added after the check is never lost)", async () => {
+    const apex = await idOf("Apex Digital Labs");
+    const linked = await createBlank("Linked Later");
+    await db.insert(tasks).values({ workspaceId: ws, code: "TASK-RACE-1", title: "Linked after the check", customerId: linked });
+    // Called directly, as if the dependency check had been done before the order/task appeared.
+    expect(await deps().customers.deleteMany([apex, linked])).toEqual([]);
+    expect(await deps().customers.findById(apex)).not.toBeNull();
+    expect(await deps().customers.findById(linked)).not.toBeNull();
+  });
+
+  it("reports a customer that gained history between the check and the delete as skipped", async () => {
+    const linked = await createBlank("Linked During Delete");
+    const repo = deps().customers;
+    let linkedConcurrently = false;
+    const racing = Object.assign(Object.create(Object.getPrototypeOf(repo)), repo, {
+      dependencies: async (ids: ReadonlyArray<number>) => {
+        const before = await repo.dependencies(ids);
+        if (linkedConcurrently) return before;
+        linkedConcurrently = true;
+        await db.insert(tasks).values({ workspaceId: ws, code: "TASK-RACE-2", title: "Linked concurrently", customerId: linked });
+        return before;
+      },
+    });
+    const result = await makeDeleteCustomers({ ...deps(), customers: racing })([linked], actor);
+    expect(result.deleted).toEqual([]);
+    expect(result.skipped).toMatchObject([{ customer: { id: linked }, tasks: 1 }]);
+    expect(await deps().customers.findById(linked)).not.toBeNull();
   });
 });
 

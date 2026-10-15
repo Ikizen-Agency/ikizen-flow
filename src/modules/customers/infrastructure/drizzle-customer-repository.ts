@@ -1,5 +1,5 @@
 import "server-only";
-import { and, asc, count, desc, eq, gte, inArray, isNotNull, isNull, like, or, sql, type SQL } from "drizzle-orm";
+import { and, asc, count, desc, eq, gte, inArray, isNotNull, isNull, like, notExists, or, sql, type SQL } from "drizzle-orm";
 import type { Database } from "@/server/db/connect";
 import { customers, orders, tasks } from "@/server/db/schema";
 import { CUSTOMER_STATUSES, effectiveCustomerStatus, type CustomerDependencies, type CustomerStatus, type CustomerTier } from "../domain/customer";
@@ -208,7 +208,17 @@ export class DrizzleCustomerRepository implements CustomerRepository {
 
   async deleteMany(ids: ReadonlyArray<number>) {
     if (ids.length === 0) return [];
-    const rows = await this.db.delete(customers).where(this.inWorkspace(inArray(customers.id, [...ids]))).returning({ id: customers.id });
+    // One DELETE statement re-checks dependencies at write time, so history linked after a caller's check is never lost.
+    const rows = await this.db
+      .delete(customers)
+      .where(
+        this.inWorkspace(
+          inArray(customers.id, [...ids]),
+          notExists(this.db.select({ id: orders.id }).from(orders).where(eq(orders.customerId, customers.id))),
+          notExists(this.db.select({ id: tasks.id }).from(tasks).where(eq(tasks.customerId, customers.id))),
+        ),
+      )
+      .returning({ id: customers.id });
     return rows.map((r) => r.id);
   }
 }
