@@ -12,17 +12,25 @@ export interface OrderManageActionsProps {
   reference: string;
   /** Composer link for editable (draft / pending) orders. */
   editHref: string | null;
-  /** Only drafts and cancelled orders can be deleted. */
+  /** Only unpaid drafts and cancelled orders can be deleted. */
   deletable: boolean;
+  /** Why an otherwise editable / deletable order is locked (it has recorded payments). */
+  lockedNotes?: ReadonlyArray<string>;
 }
 
 /** Drawer actions: reopen the order in the composer and delete it (with a destructive confirmation). */
-export function OrderManageActions({ reference, editHref, deletable }: OrderManageActionsProps) {
+export function OrderManageActions({ reference, editHref, deletable, lockedNotes = [] }: OrderManageActionsProps) {
   const [confirming, setConfirming] = useState(false);
   const [state, action, pending] = useActionState(deleteOrderAction, INITIAL_STATUS_CHANGE_STATE);
-  if (!editHref && !deletable) return null;
+  if (!editHref && !deletable && lockedNotes.length === 0) return null;
   return (
     <div className="flex flex-wrap gap-space-sm">
+      {lockedNotes.length > 0 ? (
+        <p className="flex w-full items-start gap-space-xs text-body-sm text-on-surface-variant">
+          <Icon name="lock" size={18} />
+          <span>{lockedNotes.join(" ")}</span>
+        </p>
+      ) : null}
       {editHref ? (
         <Link href={editHref} className={buttonClasses({ variant: "secondary" })}>
           <Icon name="edit" size={18} />
@@ -39,7 +47,7 @@ export function OrderManageActions({ reference, editHref, deletable }: OrderMana
         onClose={() => setConfirming(false)}
         id="delete-order"
         title={`Delete order #${reference}?`}
-        description="The order, its line items and any recorded payments are permanently removed."
+        description="The order and its line items are permanently removed."
         confirmLabel="Delete Order"
         action={action}
         fields={{ reference }}

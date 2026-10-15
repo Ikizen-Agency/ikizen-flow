@@ -1,4 +1,4 @@
-import { applyBasisPoints, type Cents } from "@/shared/domain/money";
+import { applyBasisPoints, formatMoney, type Cents } from "@/shared/domain/money";
 import { addDays, daysBetween, startOfDay } from "@/shared/domain/time";
 
 export const ORDER_STATUSES = ["draft", "pending", "processing", "invoiced", "completed", "cancelled"] as const;
@@ -154,12 +154,16 @@ export const EDITABLE_ORDER_STATUSES: ReadonlyArray<OrderStatus> = ["draft", "pe
 /** Only orders that never produced revenue can be deleted. */
 export const DELETABLE_ORDER_STATUSES: ReadonlyArray<OrderStatus> = ["draft", "cancelled"];
 
+export const ORDER_HAS_PAYMENTS_EDIT_MESSAGE = "Remove recorded payments before editing this order.";
+export const ORDER_HAS_PAYMENTS_DELETE_MESSAGE = "Orders with recorded payments cannot be deleted.";
+
 export class OrderNotEditableError extends Error {
   constructor(
     readonly reference: string,
     readonly status: OrderStatus,
+    message = `Order ${reference} is ${ORDER_STATUS_LABELS[status].toLowerCase()} and can no longer be edited. Only drafts and pending orders can be edited.`,
   ) {
-    super(`Order ${reference} is ${ORDER_STATUS_LABELS[status].toLowerCase()} and can no longer be edited. Only drafts and pending orders can be edited.`);
+    super(message);
     this.name = "OrderNotEditableError";
   }
 }
@@ -168,24 +172,58 @@ export class OrderNotDeletableError extends Error {
   constructor(
     readonly reference: string,
     readonly status: OrderStatus,
+    message = `Order ${reference} is ${ORDER_STATUS_LABELS[status].toLowerCase()} and cannot be deleted. Only drafts and cancelled orders can be deleted.`,
   ) {
-    super(`Order ${reference} is ${ORDER_STATUS_LABELS[status].toLowerCase()} and cannot be deleted. Only drafts and cancelled orders can be deleted.`);
+    super(message);
     this.name = "OrderNotDeletableError";
   }
 }
 
-export function canEditOrder(status: OrderStatus): boolean {
-  return EDITABLE_ORDER_STATUSES.includes(status);
+/** What the edit / delete guards need to know about an order. */
+export interface GuardedOrder {
+  status: OrderStatus;
+  /** Sum of the payments recorded so far. */
+  paidCents: number;
 }
 
-export function assertOrderEditable(reference: string, status: OrderStatus): void {
-  if (!canEditOrder(status)) throw new OrderNotEditableError(reference, status);
+/**
+ * Why the composer cannot reopen this order (null when it can). Paid orders are locked: editing them could push
+ * the total below what was already paid and hide an overpayment.
+ */
+export function editBlockedReason(order: GuardedOrder): string | null {
+  if (!EDITABLE_ORDER_STATUSES.includes(order.status)) return "Only drafts and pending orders can be edited.";
+  if (order.paidCents > 0) return ORDER_HAS_PAYMENTS_EDIT_MESSAGE;
+  return null;
 }
 
-export function canDeleteOrder(status: OrderStatus): boolean {
-  return DELETABLE_ORDER_STATUSES.includes(status);
+export function canEditOrder(order: GuardedOrder): boolean {
+  return editBlockedReason(order) === null;
 }
 
-export function assertOrderDeletable(reference: string, status: OrderStatus): void {
-  if (!canDeleteOrder(status)) throw new OrderNotDeletableError(reference, status);
+export function assertOrderEditable(order: GuardedOrder & { reference: string }): void {
+  if (!EDITABLE_ORDER_STATUSES.includes(order.status)) throw new OrderNotEditableError(order.reference, order.status);
+  if (order.paidCents > 0) throw new OrderNotEditableError(order.reference, order.status, ORDER_HAS_PAYMENTS_EDIT_MESSAGE);
+}
+
+/** Defense in depth for edits: a recomputed total may never fall below the payments already recorded. */
+export function assertTotalCoversPayments(reference: string, totalCents: number, paidCents: number): void {
+  if (totalCents < paidCents) {
+    throw new OrderNotEditableError(reference, "pending", `The new total of ${formatMoney(totalCents)} is below the ${formatMoney(paidCents)} already paid.`);
+  }
+}
+
+/** Why this order cannot be deleted (null when it can). Deleting would silently erase its recorded payments. */
+export function deleteBlockedReason(order: GuardedOrder): string | null {
+  if (!DELETABLE_ORDER_STATUSES.includes(order.status)) return "Only drafts and cancelled orders can be deleted.";
+  if (order.paidCents > 0) return ORDER_HAS_PAYMENTS_DELETE_MESSAGE;
+  return null;
+}
+
+export function canDeleteOrder(order: GuardedOrder): boolean {
+  return deleteBlockedReason(order) === null;
+}
+
+export function assertOrderDeletable(order: GuardedOrder & { reference: string }): void {
+  if (!DELETABLE_ORDER_STATUSES.includes(order.status)) throw new OrderNotDeletableError(order.reference, order.status);
+  if (order.paidCents > 0) throw new OrderNotDeletableError(order.reference, order.status, ORDER_HAS_PAYMENTS_DELETE_MESSAGE);
 }

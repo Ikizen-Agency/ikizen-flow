@@ -7,15 +7,18 @@ import {
   assertOrderDeletable,
   assertOrderEditable,
   assertOrderTransition,
+  assertTotalCoversPayments,
   computeOrderTotals,
   dueDateFor,
   nextOrderReference,
+  ORDER_HAS_PAYMENTS_DELETE_MESSAGE,
   ORDER_STATUS_LABELS,
+  OrderNotDeletableError,
   type OrderCategory,
   type OrderStatus,
   type PaymentTerms,
 } from "../domain/order";
-import { assertPaymentAllowed, orderBalance, statusAfterPayment, statusAfterPaymentRemoval, type PaymentMethod } from "../domain/payment";
+import { assertPaymentAllowed, statusAfterPaymentRemoval, type PaymentMethod } from "../domain/payment";
 import { formatMoney } from "@/shared/domain/money";
 import type { NewOrderItem, OrderListQuery, OrderRepository, PaymentRepository } from "./ports";
 
@@ -95,10 +98,9 @@ export const makeChangeOrderStatus =
     const order = await orders.findByReference(reference);
     if (!order) throw new NotFoundError("Order", reference);
     assertOrderTransition(order.status, status);
-    // "Mark as Paid" settles whatever is still due, so payments always add up to a completed order's total.
-    const balance = orderBalance(order);
-    if (status === "completed" && balance > 0) {
-      await payments.create({ orderId: order.id, amountCents: balance, method: "other", paidAt: now, note: "Marked as paid", recordedById: actorId }, now);
+    // "Mark as Paid" settles whatever is still due (re-read atomically), so payments always add up to a completed order's total.
+    if (status === "completed") {
+      await payments.settleBalance({ orderId: order.id, method: "other", paidAt: now, note: "Marked as paid", recordedById: actorId }, now);
     }
 
     const invoiceNumber =
@@ -174,11 +176,12 @@ export const makeUpdateOrder =
   async (reference: string, input: UpdateOrderInput, actorId: number | null = null) => {
     const order = await orders.findByReference(reference);
     if (!order) throw new NotFoundError("Order", reference);
-    assertOrderEditable(order.reference, order.status);
+    assertOrderEditable(order);
     const customer = await customers.findById(input.customerId);
     if (!customer) throw new NotFoundError("Customer", input.customerId);
     const now = clock();
     const totals = computeOrderTotals(input.items, { discountBps: input.discountBps, taxBps: input.taxBps });
+    assertTotalCoversPayments(order.reference, totals.totalCents, order.paidCents);
     await orders.update(order.id, {
       customerId: customer.id,
       title: input.items[0]?.title ?? order.title,
@@ -205,14 +208,15 @@ export const makeUpdateOrder =
     return { reference: order.reference };
   };
 
-/** Deletes a draft or cancelled order (items and payments cascade). */
+/** Deletes an unpaid draft or cancelled order (items cascade); orders with recorded payments are never deleted. */
 export const makeDeleteOrder =
   ({ orders, activity, clock }: Pick<SalesDeps, "orders" | "activity" | "clock">) =>
   async (reference: string, actorId: number | null = null) => {
     const order = await orders.findByReference(reference);
     if (!order) throw new NotFoundError("Order", reference);
-    assertOrderDeletable(order.reference, order.status);
-    await orders.delete(order.id);
+    assertOrderDeletable(order);
+    // The repository re-checks payments atomically: one recorded after the check above still blocks the delete.
+    if (!(await orders.delete(order.id))) throw new OrderNotDeletableError(order.reference, order.status, ORDER_HAS_PAYMENTS_DELETE_MESSAGE);
     await activity.record({
       actorId,
       message: `deleted ${ORDER_STATUS_LABELS[order.status].toLowerCase()} order #${order.reference} for ${order.customerCompany}`,
@@ -238,22 +242,17 @@ export const makeRecordPayment =
   async (reference: string, input: RecordPaymentInput, actorId: number | null = null) => {
     const order = await orders.findByReference(reference);
     if (!order) throw new NotFoundError("Order", reference);
+    // Fail fast on the snapshot; the repository re-checks status and balance inside its transaction.
     assertPaymentAllowed(order, input.amountCents);
     const now = clock();
     const paidAt = input.paidAt ?? now;
-    const payment = await payments.create(
+    const { payment, paidCents, completed } = await payments.record(
       { orderId: order.id, amountCents: input.amountCents, method: input.method, paidAt, reference: input.reference ?? null, note: input.note ?? null, recordedById: actorId },
       now,
     );
-    const paidCents = order.paidCents + input.amountCents;
-    const next = statusAfterPayment(order.status, order.amountCents, paidCents);
-    if (next) {
-      assertOrderTransition(order.status, next);
-      await orders.updateStatus(order.id, { status: next, invoiceNumber: order.invoiceNumber, paidAt, updatedAt: now });
-    }
     await activity.record({
       actorId,
-      message: `recorded a ${formatMoney(input.amountCents)} payment on order #${order.reference}${next ? " (paid in full)" : ""}`,
+      message: `recorded a ${formatMoney(input.amountCents)} payment on order #${order.reference}${completed ? " (paid in full)" : ""}`,
       category: "billing",
       entityType: "order",
       entityId: order.id,
@@ -265,11 +264,11 @@ export const makeRecordPayment =
         actorId,
         type: "payment_received",
         title: `Payment of ${formatMoney(input.amountCents)} received for ${order.reference}`,
-        body: next ? `${order.customerCompany} · paid in full` : `${order.customerCompany} · ${formatMoney(order.amountCents - paidCents)} still due`,
+        body: completed ? `${order.customerCompany} · paid in full` : `${order.customerCompany} · ${formatMoney(order.amountCents - paidCents)} still due`,
         href: `/sales?order=${encodeURIComponent(order.reference)}`,
       });
     }
-    return { payment, completed: next === "completed" };
+    return { payment, completed };
   };
 
 /** Removes a payment; a completed order that is no longer fully paid goes back to invoiced. */

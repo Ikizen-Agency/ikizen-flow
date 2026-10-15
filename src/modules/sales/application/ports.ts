@@ -124,13 +124,27 @@ export interface NewPayment {
   recordedById: number | null;
 }
 
+export interface PaymentRecorded {
+  payment: Payment;
+  /** Paid total of the order after this payment. */
+  paidCents: number;
+  /** True when this payment settled the order and moved it to completed. */
+  completed: boolean;
+}
+
 /** Payments of one workspace (orders of other workspaces are unreachable). */
 export interface PaymentRepository {
   /** Newest first. */
   listForOrder(orderId: number): Promise<Payment[]>;
   findById(id: number): Promise<Payment | null>;
-  /** Throws `NotFoundError` when the order is not in this workspace. */
-  create(payment: NewPayment, now: Date): Promise<Payment>;
+  /**
+   * In one transaction: re-reads the order's status and paid total, asserts the payment fits the balance
+   * (`PaymentRejectedError`), inserts it and completes a fully paid order (`paidAt` = the payment's).
+   * Throws `NotFoundError` when the order is not in this workspace.
+   */
+  record(payment: NewPayment, now: Date): Promise<PaymentRecorded>;
+  /** In one transaction: records whatever is still due on the order (null when nothing is). For "Mark as Paid". */
+  settleBalance(payment: Omit<NewPayment, "amountCents">, now: Date): Promise<Payment | null>;
   /** Returns false when the payment does not exist in this workspace. */
   delete(id: number): Promise<boolean>;
 }
@@ -147,6 +161,6 @@ export interface OrderRepository {
   updateStatus(id: number, change: OrderStatusChange): Promise<void>;
   /** Replaces the order's fields and line items (customer must belong to the workspace). */
   update(id: number, update: OrderUpdate): Promise<void>;
-  /** Hard delete (line items and payments cascade). */
-  delete(id: number): Promise<void>;
+  /** Hard delete of an order without payments (line items cascade); returns false when it has payments or does not exist. */
+  delete(id: number): Promise<boolean>;
 }

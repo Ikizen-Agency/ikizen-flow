@@ -1,7 +1,7 @@
 import "server-only";
-import { and, asc, count, desc, eq, gte, inArray, like, lt, lte, or, sql, type SQL } from "drizzle-orm";
+import { and, asc, count, desc, eq, gte, inArray, like, lt, lte, notExists, or, sql, type SQL } from "drizzle-orm";
 import type { Database } from "@/server/db/connect";
-import { customers, orderItems, orders } from "@/server/db/schema";
+import { customers, orderItems, orders, payments } from "@/server/db/schema";
 import { OPEN_ORDER_STATUSES, ORDER_STATUSES, overdueCutoff, type EffectiveOrderStatus, type OrderStatus } from "../domain/order";
 import { NotFoundError } from "../../shared-types";
 import type { NewOrder, Order, OrderListQuery, OrderRepository, OrderStatusChange, OrderUpdate } from "../application/ports";
@@ -179,6 +179,11 @@ export class DrizzleOrderRepository implements OrderRepository {
   }
 
   async delete(id: number) {
-    await this.db.delete(orders).where(this.inWorkspace(eq(orders.id, id)));
+    // The payments check runs in the DELETE itself, so a payment recorded after the caller's check is never erased.
+    const deleted = await this.db
+      .delete(orders)
+      .where(this.inWorkspace(eq(orders.id, id), notExists(this.db.select({ id: payments.id }).from(payments).where(eq(payments.orderId, orders.id)))))
+      .returning({ id: orders.id });
+    return deleted.length > 0;
   }
 }

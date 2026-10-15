@@ -3,6 +3,10 @@ import {
   assertOrderDeletable,
   assertOrderEditable,
   assertOrderTransition,
+  assertTotalCoversPayments,
+  deleteBlockedReason,
+  editBlockedReason,
+  type OrderStatus,
   canDeleteOrder,
   canEditOrder,
   OrderNotDeletableError,
@@ -131,25 +135,48 @@ describe("orderStatusTone", () => {
 });
 
 describe("order editing and deletion rules", () => {
-  it("lets drafts and pending orders be reopened in the composer", () => {
-    expect(canEditOrder("draft")).toBe(true);
-    expect(canEditOrder("pending")).toBe(true);
-    expect(() => assertOrderEditable("SL-1", "draft")).not.toThrow();
+  const unpaid = (status: OrderStatus) => ({ reference: "SL-1", status, paidCents: 0 });
+
+  it("lets unpaid drafts and pending orders be reopened in the composer", () => {
+    expect(canEditOrder(unpaid("draft"))).toBe(true);
+    expect(canEditOrder(unpaid("pending"))).toBe(true);
+    expect(editBlockedReason(unpaid("pending"))).toBeNull();
+    expect(() => assertOrderEditable(unpaid("draft"))).not.toThrow();
   });
 
   it("rejects editing orders that are in progress, invoiced or closed", () => {
     for (const status of ["processing", "invoiced", "completed", "cancelled"] as const) {
-      expect(canEditOrder(status)).toBe(false);
-      expect(() => assertOrderEditable("SL-1", status)).toThrow(OrderNotEditableError);
+      expect(canEditOrder(unpaid(status))).toBe(false);
+      expect(() => assertOrderEditable(unpaid(status))).toThrow(OrderNotEditableError);
     }
   });
 
-  it("only deletes drafts and cancelled orders", () => {
-    expect(canDeleteOrder("draft")).toBe(true);
-    expect(canDeleteOrder("cancelled")).toBe(true);
+  it("rejects editing an order that already has recorded payments", () => {
+    const paid = { reference: "SL-1", status: "pending" as const, paidCents: 1 };
+    expect(canEditOrder(paid)).toBe(false);
+    expect(editBlockedReason(paid)).toBe("Remove recorded payments before editing this order.");
+    expect(() => assertOrderEditable(paid)).toThrow(new OrderNotEditableError("SL-1", "pending", "Remove recorded payments before editing this order."));
+  });
+
+  it("never lets a new total fall below what was already paid", () => {
+    expect(() => assertTotalCoversPayments("SL-1", 5_000, 5_000)).not.toThrow();
+    expect(() => assertTotalCoversPayments("SL-1", 4_999, 5_000)).toThrow(OrderNotEditableError);
+  });
+
+  it("only deletes unpaid drafts and cancelled orders", () => {
+    expect(canDeleteOrder(unpaid("draft"))).toBe(true);
+    expect(canDeleteOrder(unpaid("cancelled"))).toBe(true);
+    expect(deleteBlockedReason(unpaid("cancelled"))).toBeNull();
     for (const status of ["pending", "processing", "invoiced", "completed"] as const) {
-      expect(canDeleteOrder(status)).toBe(false);
-      expect(() => assertOrderDeletable("SL-1", status)).toThrow(OrderNotDeletableError);
+      expect(canDeleteOrder(unpaid(status))).toBe(false);
+      expect(() => assertOrderDeletable(unpaid(status))).toThrow(OrderNotDeletableError);
     }
+  });
+
+  it("refuses to delete an order with recorded payments, even once cancelled", () => {
+    const paid = { reference: "SL-1", status: "cancelled" as const, paidCents: 2_500 };
+    expect(canDeleteOrder(paid)).toBe(false);
+    expect(deleteBlockedReason(paid)).toBe("Orders with recorded payments cannot be deleted.");
+    expect(() => assertOrderDeletable(paid)).toThrow("Orders with recorded payments cannot be deleted.");
   });
 });

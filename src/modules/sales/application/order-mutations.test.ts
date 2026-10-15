@@ -96,6 +96,28 @@ describe("updateOrder", () => {
   });
 });
 
+describe("orders with recorded payments", () => {
+  it("refuses to edit a pending order that already has payments (no hidden overpayment)", async () => {
+    const pending = await newOrder("pending");
+    await makeRecordPayment(deps())(pending.reference, { amountCents: 50_000, method: "card" }, actor);
+    await expect(
+      makeUpdateOrder(deps())(pending.reference, { customerId: pending.customerId, category: "custom_software", paymentTerms: "net_30", items: [{ title: "Cheaper", quantity: 1, unitRateCents: 10_000 }] }, actor),
+    ).rejects.toThrow("Remove recorded payments before editing this order.");
+    expect((await deps().orders.findByReference(pending.reference))!.amountCents).toBe(100_000);
+  });
+
+  it("refuses to delete a cancelled order with payments and keeps its payments", async () => {
+    const pending = await newOrder("pending");
+    await makeRecordPayment(deps())(pending.reference, { amountCents: 20_000, method: "cash" }, actor);
+    await makeChangeOrderStatus(deps())(pending.reference, "cancelled", actor);
+    await expect(makeDeleteOrder(deps())(pending.reference, actor)).rejects.toThrow("Orders with recorded payments cannot be deleted.");
+    // The repository re-checks payments in the DELETE itself (no window between the check and the delete).
+    expect(await deps().orders.delete(pending.id)).toBe(false);
+    expect(await deps().orders.findByReference(pending.reference)).not.toBeNull();
+    expect((await deps().payments.listForOrder(pending.id)).map((p) => p.amountCents)).toEqual([20_000]);
+  });
+});
+
 describe("deleteOrder", () => {
   it("deletes drafts and cancelled orders", async () => {
     const draft = await newOrder("draft");
@@ -168,9 +190,41 @@ describe("payments", () => {
     expect(await foreign.findById(payment!.id)).toBeNull();
     expect(await foreign.listForOrder(order.id)).toEqual([]);
     expect(await foreign.delete(payment!.id)).toBe(false);
-    await expect(foreign.create({ orderId: order.id, amountCents: 5, method: "cash", paidAt: now, recordedById: null }, now)).rejects.toBeInstanceOf(NotFoundError);
+    await expect(foreign.record({ orderId: order.id, amountCents: 5, method: "cash", paidAt: now, recordedById: null }, now)).rejects.toBeInstanceOf(NotFoundError);
+    await expect(foreign.settleBalance({ orderId: order.id, method: "cash", paidAt: now, recordedById: null }, now)).rejects.toBeInstanceOf(NotFoundError);
     await expect(makeDeletePayment(deps(sandboxWs))(payment!.id, null)).rejects.toBeInstanceOf(NotFoundError);
     expect(await deps().payments.findById(payment!.id)).not.toBeNull();
+  });
+});
+
+describe("atomic payment recording", () => {
+  const payment = (orderId: number, amountCents: number) => ({ orderId, amountCents, method: "card" as const, paidAt: now, recordedById: actor });
+
+  it("re-reads the balance inside the transaction, so a second payment over the balance is refused", async () => {
+    const order = await inStatus("invoiced");
+    const repo = deps().payments;
+    expect(await repo.record(payment(order.id, 60_000), now)).toMatchObject({ paidCents: 60_000, completed: false });
+    await expect(repo.record(payment(order.id, 60_000), now)).rejects.toBeInstanceOf(PaymentRejectedError);
+    const settled = await repo.record(payment(order.id, 40_000), now);
+    expect(settled).toMatchObject({ paidCents: 100_000, completed: true });
+    expect(await deps().orders.findByReference(order.reference)).toMatchObject({ status: "completed", paidCents: 100_000, paidAt: now });
+  });
+
+  it("lets only one of two concurrent payments over the balance through", async () => {
+    const order = await inStatus("invoiced");
+    const repo = deps().payments;
+    const outcomes = await Promise.allSettled([repo.record(payment(order.id, 60_000), now), repo.record(payment(order.id, 60_000), now)]);
+    expect(outcomes.filter((o) => o.status === "fulfilled")).toHaveLength(1);
+    expect((await deps().orders.findByReference(order.reference))!.paidCents).toBe(60_000);
+  });
+
+  it("settles only the remaining balance when an order is marked as paid twice", async () => {
+    const order = await inStatus("invoiced");
+    const repo = deps().payments;
+    const settle = { orderId: order.id, method: "other" as const, paidAt: now, note: "Marked as paid", recordedById: actor };
+    expect(await repo.settleBalance(settle, now)).toMatchObject({ amountCents: 100_000 });
+    expect(await repo.settleBalance(settle, now)).toBeNull();
+    expect((await deps().orders.findByReference(order.reference))!.paidCents).toBe(100_000);
   });
 });
 

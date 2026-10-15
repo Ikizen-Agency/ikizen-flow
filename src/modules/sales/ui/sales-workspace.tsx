@@ -12,6 +12,10 @@ import {
   allowedOrderTransitions,
   canDeleteOrder,
   canEditOrder,
+  deleteBlockedReason,
+  editBlockedReason,
+  ORDER_HAS_PAYMENTS_DELETE_MESSAGE,
+  ORDER_HAS_PAYMENTS_EDIT_MESSAGE,
   effectiveOrderStatus,
   ORDER_CATEGORIES,
   ORDER_CATEGORY_LABELS,
@@ -113,7 +117,7 @@ export async function SalesWorkspace({ searchParams }: { searchParams: Promise<S
   ]);
   const payments = selected ? await app.sales.payments(selected.id) : [];
   const editing: SaleFormEditing | null =
-    editingOrder && canEditOrder(editingOrder.status)
+    editingOrder && canEditOrder(editingOrder)
       ? {
           reference: editingOrder.reference,
           statusLabel: ORDER_STATUS_LABELS[editingOrder.status],
@@ -293,8 +297,11 @@ export async function SalesWorkspace({ searchParams }: { searchParams: Promise<S
           manage={
             <OrderManageActions
               reference={selected.reference}
-              editHref={canEditOrder(selected.status) ? hrefWith(PATH, { edit: selected.reference }) : null}
-              deletable={canDeleteOrder(selected.status)}
+              editHref={canEditOrder(selected) ? hrefWith(PATH, { edit: selected.reference }) : null}
+              deletable={canDeleteOrder(selected)}
+              lockedNotes={[editBlockedReason(selected), deleteBlockedReason(selected)].filter(
+                (reason): reason is string => reason === ORDER_HAS_PAYMENTS_EDIT_MESSAGE || reason === ORDER_HAS_PAYMENTS_DELETE_MESSAGE,
+              )}
             />
           }
           payments={
