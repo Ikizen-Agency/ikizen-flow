@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useId, useRef, useState } from "react";
 import { signOutAction } from "@/modules/auth/ui/actions";
+import type { AvatarColor } from "@/shared/domain/avatar-colors";
 import { Avatar } from "@/shared/ui/avatar";
 import { Icon } from "@/shared/ui/icon";
 
@@ -14,6 +15,7 @@ export interface UserMenuProps {
   /** Access level in the active workspace ("Owner"). */
   roleLabel: string;
   workspaceName: string;
+  avatarColor: AvatarColor | null;
 }
 
 const LINKS = [
@@ -22,7 +24,7 @@ const LINKS = [
 ] as const;
 
 /** Topbar avatar menu: who is signed in, links to profile settings and help, and log out. */
-export function UserMenu({ name, email, title, roleLabel, workspaceName }: UserMenuProps) {
+export function UserMenu({ name, email, title, roleLabel, workspaceName, avatarColor }: UserMenuProps) {
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
   const button = useRef<HTMLButtonElement>(null);
@@ -62,13 +64,13 @@ export function UserMenu({ name, email, title, roleLabel, workspaceName }: UserM
         onClick={() => setOpen((v) => !v)}
         className="rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
       >
-        <Avatar name={name} />
+        <Avatar name={name} color={avatarColor} />
         <span className="sr-only">Account menu for {name}</span>
       </button>
       {open ? (
         <div id={menuId} role="menu" aria-label="Account" className="absolute right-0 z-50 mt-2 w-64 rounded-card border border-line-strong bg-card p-1 shadow-level-2">
           <div className="flex items-center gap-space-sm border-b border-line px-space-sm pt-space-xs pb-space-sm">
-            <Avatar name={name} />
+            <Avatar name={name} color={avatarColor} />
             <div className="flex min-w-0 flex-col">
               <span className="truncate text-label-md text-ink">{name}</span>
               <span className="truncate text-body-sm text-ink-subtle">{email}</span>

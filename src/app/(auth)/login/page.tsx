@@ -26,7 +26,7 @@ async function LoginScreen({ searchParams }: { searchParams: PageProps<"/login">
       footer={
         <>
           New to Ikizen Flow?{" "}
-          <Link href="/register" className="text-label-md text-accent hover:underline">
+          <Link href={next === "/" ? "/register" : `/register?next=${encodeURIComponent(next)}`} className="text-label-md text-accent hover:underline">
             Create a workspace
           </Link>
         </>

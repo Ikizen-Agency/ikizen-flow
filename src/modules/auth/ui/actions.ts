@@ -60,7 +60,7 @@ export async function registerAction(_prev: AuthFormState, formData: FormData): 
     return { status: "error", message: "We could not create your account. Please try again.", values };
   }
   (await cookies()).delete(ACTIVE_WORKSPACE_COOKIE);
-  redirect("/");
+  redirect(safeNextPath(formData.get("next")?.toString()));
 }
 
 export async function signOutAction(): Promise<void> {

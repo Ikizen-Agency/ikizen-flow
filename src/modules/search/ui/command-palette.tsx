@@ -29,6 +29,10 @@ const PAGES: PaletteItem[] = [
   { id: "p-invoices", group: "Go to", label: "Invoices", icon: "receipt_long", href: "/invoices" },
   { id: "p-reports", group: "Go to", label: "Reports", icon: "bar_chart", href: "/reports" },
   { id: "p-settings", group: "Go to", label: "Settings", icon: "settings", href: "/settings" },
+  { id: "p-settings-members", group: "Go to", label: "Settings: Members & invitations", icon: "group_add", href: "/settings?tab=members" },
+  { id: "p-settings-profile", group: "Go to", label: "Settings: Profile & password", icon: "person", href: "/settings?tab=profile" },
+  { id: "p-settings-notifications", group: "Go to", label: "Settings: Notification preferences", icon: "notifications", href: "/settings?tab=notifications" },
+  { id: "p-settings-email", group: "Go to", label: "Settings: Email & outbox", icon: "mail", href: "/settings?tab=email" },
   { id: "p-help", group: "Go to", label: "Help & Support", icon: "help_outline", href: "/help" },
 ];
 

@@ -28,7 +28,7 @@ export async function SidebarUserCard() {
   return (
     <div className="flex items-center justify-center rounded-control bg-surface-container-low p-space-sm lg:justify-between">
       <div className="flex min-w-0 items-center gap-space-sm">
-        <Avatar name={member.name} />
+        <Avatar name={member.name} color={member.avatarColor} />
         <div className="hidden min-w-0 flex-col lg:flex">
           <span className="truncate text-label-md text-ink">{member.name}</span>
           <span className="truncate text-body-sm text-ink-subtle">{member.role}</span>
@@ -60,5 +60,14 @@ export function WorkspaceBreadcrumbSkeleton() {
 /** Topbar avatar with the account menu. */
 export async function TopbarUser() {
   const { user, member, role, workspace } = await requireRequestContext();
-  return <UserMenu name={member.name} email={user.email} title={member.role} roleLabel={WORKSPACE_ROLE_LABELS[role]} workspaceName={workspace.name} />;
+  return (
+    <UserMenu
+      name={member.name}
+      email={user.email}
+      title={member.role}
+      roleLabel={WORKSPACE_ROLE_LABELS[role]}
+      workspaceName={workspace.name}
+      avatarColor={member.avatarColor ?? null}
+    />
+  );
 }

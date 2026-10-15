@@ -14,12 +14,14 @@ const FIELDS = [
   { name: "workspaceName", label: "Workspace name", type: "text", icon: "business", autoComplete: "organization", hint: "Your company or team. You will be its owner." },
 ] as const;
 
-export function RegisterForm() {
+/** `next`: where to go after registering (e.g. back to an invitation link). */
+export function RegisterForm({ next = "/" }: { next?: string }) {
   const [state, formAction, pending] = useActionState(registerAction, INITIAL_AUTH_STATE);
   const errors = state.fieldErrors ?? {};
 
   return (
     <form action={formAction} className="flex flex-col gap-space-md" noValidate>
+      <input type="hidden" name="next" value={next} />
       {state.message ? <FormAlert message={state.message} /> : null}
       {FIELDS.map((f) => {
         const error = errors[f.name]?.[0];

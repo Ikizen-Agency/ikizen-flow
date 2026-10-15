@@ -1,14 +1,13 @@
 import type { Metadata } from "next";
-import { ComingSoon } from "@/shared/shell/coming-soon";
+import { Suspense } from "react";
+import { SettingsPage, SettingsPageSkeleton } from "@/modules/settings/ui/settings-page";
 
 export const metadata: Metadata = { title: "Settings" };
 
-export default function SettingsPage() {
+export default function Settings({ searchParams }: PageProps<"/settings">) {
   return (
-    <ComingSoon
-      title="Settings"
-      icon="settings"
-      description="Workspace preferences, members, billing and integrations."
-    />
+    <Suspense fallback={<SettingsPageSkeleton />}>
+      <SettingsPage searchParams={searchParams} />
+    </Suspense>
   );
 }

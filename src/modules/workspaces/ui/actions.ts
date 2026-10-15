@@ -1,12 +1,11 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
-import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { directory } from "@/server/container";
-import { ACTIVE_WORKSPACE_COOKIE, requireRequestContext } from "@/server/request-context";
+import { requireRequestContext } from "@/server/request-context";
 import { InvalidWorkspaceNameError, WORKSPACE_NAME_MAX_LENGTH } from "../application/use-cases";
+import { setActiveWorkspace } from "./active-workspace";
 
 const switchSchema = z.object({ workspaceId: z.coerce.number().int().positive() });
 
@@ -19,16 +18,7 @@ export async function switchWorkspaceAction(formData: FormData): Promise<void> {
   redirect("/");
 }
 
-async function activateWorkspace(workspaceId: number) {
-  (await cookies()).set(ACTIVE_WORKSPACE_COOKIE, String(workspaceId), {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    path: "/",
-    maxAge: 60 * 60 * 24 * 365,
-  });
-  revalidatePath("/", "layout");
-}
+const activateWorkspace = setActiveWorkspace;
 
 const createSchema = z.object({
   name: z.string().trim().min(1, "Workspace name is required.").max(WORKSPACE_NAME_MAX_LENGTH, `Use at most ${WORKSPACE_NAME_MAX_LENGTH} characters.`),
