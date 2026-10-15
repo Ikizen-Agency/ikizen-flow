@@ -6,10 +6,10 @@ import { useEffect, useState } from "react";
 import { signOutAction } from "@/modules/auth/ui/actions";
 import { cn } from "@/shared/lib/cn";
 import { Icon } from "@/shared/ui/icon";
-import { isActive, NAV_ITEMS } from "./navigation";
+import { HELP_ITEM, isActive, NAV_ITEMS } from "./navigation";
 
 const primary = NAV_ITEMS.filter((i) => i.primaryOnMobile);
-const secondary = NAV_ITEMS.filter((i) => !i.primaryOnMobile);
+const secondary = [...NAV_ITEMS.filter((i) => !i.primaryOnMobile), { ...HELP_ITEM, primaryOnMobile: false }];
 
 /** Mobile (< 768px) bottom bar with a "More" sheet for secondary destinations. */
 export function MobileNav() {

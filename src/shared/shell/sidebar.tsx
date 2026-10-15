@@ -1,9 +1,8 @@
 import Link from "next/link";
 import { Suspense } from "react";
-import { Icon } from "@/shared/ui/icon";
 import { Logo } from "./logo";
 import { SidebarNavLink } from "./nav-link";
-import { NAV_ITEMS } from "./navigation";
+import { HELP_ITEM, NAV_ITEMS } from "./navigation";
 import { SidebarUserCard, SidebarUserCardSkeleton, WorkspaceSwitcher, WorkspaceSwitcherSkeleton } from "./session-widgets";
 
 /**
@@ -30,16 +29,7 @@ export function Sidebar() {
         </nav>
       </div>
       <div className="space-y-space-sm p-space-md">
-        <a
-          href="https://nextjs.org/docs"
-          target="_blank"
-          rel="noreferrer"
-          title="Documentation & Support"
-          className="flex items-center justify-center gap-space-sm rounded-control px-space-sm py-space-xs text-label-md text-ink-muted transition-colors hover:bg-well hover:text-ink lg:justify-start"
-        >
-          <Icon name="help_outline" size={18} />
-          <span className="hidden lg:inline">Documentation &amp; Support</span>
-        </a>
+        <SidebarNavLink item={{ href: HELP_ITEM.href, label: "Documentation & Support", icon: HELP_ITEM.icon, primaryOnMobile: false }} />
         <Suspense fallback={<SidebarUserCardSkeleton />}>
           <SidebarUserCard />
         </Suspense>

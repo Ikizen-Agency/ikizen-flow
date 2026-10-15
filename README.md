@@ -10,6 +10,8 @@ Fullstack business operations platform built with Next.js, implementing the Stit
 | `/customers` | Customers directory: search, filters, pagination, detail panel, create customer | Server Actions, `GET /customers/export` (CSV) |
 | `/sales` | Sales orders: KPIs, status tabs, create order with line items, status transitions | Server Actions, `GET /api/orders` (JSON / CSV) |
 | `/tasks` | Tasks kanban: filters, drag and drop, list view, task detail, create task | Server Actions with optimistic updates |
+| `/help` | Help Center: getting started, keyboard shortcuts, module guides, FAQ, contact support form | Server Action emails `SUPPORT_EMAIL` through the outbox |
+| Shell | ⌘K / Ctrl+K command palette (customers, orders, tasks, quick actions, navigation), notifications bell (unread first, mark read / all read), per-route breadcrumb, account menu, workspace switcher + create workspace | `GET /api/search?q=` (JSON, grouped, workspace-scoped), Server Actions |
 | `/login`, `/register` | Email + password sign-in; registration creates a new workspace owned by the new user | Better Auth (`/api/auth/*`) |
 
 Invoices, Reports and Settings are placeholders. Every screen, Server Action and Route Handler requires a session, and all business data is scoped to the active workspace.
@@ -37,7 +39,7 @@ Open http://localhost:3000 and sign in with the demo account (shown on the login
 | --- | --- | --- |
 | `alex@northstar.studio` | `ikizen-demo-123` | Northstar Studio (owner, full design dataset), Helix Labs Sandbox (owner, small dataset) |
 
-Switch workspaces from the workspace card at the top of the sidebar. Upgrading a database created before workspaces existed requires `pnpm db:reset` (the migration adds required `workspace_id` columns).
+Switch or create workspaces from the workspace card at the top of the sidebar. The seed adds a few notifications for Alex (two unread) and two outbox entries. Upgrading a database created before workspaces existed requires `pnpm db:reset` (the migration adds required `workspace_id` columns).
 
 ## Environment
 
@@ -73,7 +75,7 @@ Screaming, hexagonal-lite structure organized by feature:
 src/
   app/                       # thin routes (containers): pages, layouts, route handlers
   proxy.ts                   # optimistic auth redirect (Next 16 Proxy, formerly Middleware)
-  modules/<feature>/         # auth, workspaces, customers, sales, tasks, dashboard, activity, team
+  modules/<feature>/         # auth, workspaces, customers, sales, tasks, dashboard, activity, team, mail, notifications, search, help
     domain/                  # types and pure business rules (tested)
     application/             # ports (repository interfaces) and use cases
     infrastructure/          # Drizzle repositories implementing the ports
