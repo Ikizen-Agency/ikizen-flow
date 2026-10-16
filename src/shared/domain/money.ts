@@ -15,6 +15,8 @@ const usdCompact = new Intl.NumberFormat("en-US", {
   style: "currency",
   currency: "USD",
   notation: "compact",
+  // Explicit minimum: older ICU builds (Node 22) otherwise render "$18.0K" instead of "$18K".
+  minimumFractionDigits: 0,
   maximumFractionDigits: 1,
 });
 
