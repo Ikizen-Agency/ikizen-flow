@@ -15,6 +15,11 @@ describe("isEphemeralDemo", () => {
     expect(isEphemeralDemo({ IKIZEN_DEMO_MODE: " ephemeral ", DATABASE_URL: "file:./x.db" })).toBe(true);
   });
 
+  it("never treats a remote database as an ephemeral demo, even when the flag is set", () => {
+    expect(isEphemeralDemo({ IKIZEN_DEMO_MODE: "ephemeral", DATABASE_URL: "libsql://flow.turso.io" })).toBe(false);
+    expect(isEphemeralDemo({ IKIZEN_DEMO_MODE: "ephemeral", VERCEL: "1", DATABASE_URL: "https://db.example.com" })).toBe(false);
+  });
+
   it("turns on automatically on Vercel without a configured database", () => {
     expect(isEphemeralDemo({ VERCEL: "1" })).toBe(true);
     expect(isEphemeralDemo({ VERCEL: "1", DATABASE_URL: "  " })).toBe(true);

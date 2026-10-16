@@ -7,8 +7,13 @@
 export const DEMO_DATABASE_URL = "file:/tmp/ikizen.db";
 export const DEMO_UPLOADS_DIR = "/tmp/ikizen-uploads";
 
-/** On with `IKIZEN_DEMO_MODE=ephemeral`, or automatically on Vercel (`VERCEL=1`) when no `DATABASE_URL` is configured. */
+/**
+ * On with `IKIZEN_DEMO_MODE=ephemeral`, or automatically on Vercel (`VERCEL=1`) when no `DATABASE_URL` is configured.
+ * A remote (non-`file:`) database is never a demo: demo mode migrates, seeds and wipes uploads at runtime.
+ */
 export function isEphemeralDemo(env: Readonly<Record<string, string | undefined>>): boolean {
+  const databaseUrl = env.DATABASE_URL?.trim();
+  if (databaseUrl && !databaseUrl.startsWith("file:")) return false;
   if (env.IKIZEN_DEMO_MODE?.trim() === "ephemeral") return true;
-  return env.VERCEL === "1" && !env.DATABASE_URL?.trim();
+  return env.VERCEL === "1" && !databaseUrl;
 }
