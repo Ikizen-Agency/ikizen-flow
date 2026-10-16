@@ -22,7 +22,11 @@ describe("safeNextPath", () => {
 
 describe("resolveAuthEnv", () => {
   it("uses safe local defaults in development", () => {
-    expect(resolveAuthEnv({ NODE_ENV: "development" })).toEqual({ secret: DEV_AUTH_SECRET, baseURL: "http://localhost:3000" });
+    expect(resolveAuthEnv({ NODE_ENV: "development" })).toEqual({
+      secret: DEV_AUTH_SECRET,
+      baseURL: "http://localhost:3000",
+      trustedOrigins: ["http://localhost:3000"],
+    });
   });
 
   it("reads configured values", () => {
@@ -30,6 +34,7 @@ describe("resolveAuthEnv", () => {
     expect(resolveAuthEnv({ NODE_ENV: "production", BETTER_AUTH_SECRET: secret, BETTER_AUTH_URL: "https://flow.example.com" })).toEqual({
       secret,
       baseURL: "https://flow.example.com",
+      trustedOrigins: ["https://flow.example.com"],
     });
   });
 
@@ -40,6 +45,49 @@ describe("resolveAuthEnv", () => {
 
   it("lets `next build` compile without production secrets", () => {
     expect(resolveAuthEnv({ NODE_ENV: "production", NEXT_PHASE: "phase-production-build" }).secret).toBe(DEV_AUTH_SECRET);
+  });
+
+  it("only trusts the base URL outside Vercel", () => {
+    expect(resolveAuthEnv({ NODE_ENV: "development" }).trustedOrigins).toEqual(["http://localhost:3000"]);
+  });
+
+  describe("on Vercel", () => {
+    const secret = "y".repeat(40);
+    const vercel = {
+      NODE_ENV: "production",
+      BETTER_AUTH_SECRET: secret,
+      VERCEL: "1",
+      VERCEL_PROJECT_PRODUCTION_URL: "flow.example.com",
+      VERCEL_URL: "flow-abc123.vercel.app",
+      VERCEL_BRANCH_URL: "flow-git-staging.vercel.app",
+    };
+
+    it("falls back to the production domain in production", () => {
+      const resolved = resolveAuthEnv({ ...vercel, VERCEL_ENV: "production" });
+      expect(resolved.baseURL).toBe("https://flow.example.com");
+      expect(resolved.trustedOrigins).toEqual(["https://flow.example.com", "https://flow-abc123.vercel.app", "https://flow-git-staging.vercel.app"]);
+    });
+
+    it("uses the deployment URL for previews and trusts the branch and production URLs", () => {
+      const resolved = resolveAuthEnv({ ...vercel, VERCEL_ENV: "preview" });
+      expect(resolved.baseURL).toBe("https://flow-abc123.vercel.app");
+      expect(resolved.trustedOrigins).toEqual(["https://flow-abc123.vercel.app", "https://flow-git-staging.vercel.app", "https://flow.example.com"]);
+    });
+
+    it("prefers an explicit BETTER_AUTH_URL and still trusts the Vercel URLs", () => {
+      const resolved = resolveAuthEnv({ ...vercel, VERCEL_ENV: "production", BETTER_AUTH_URL: "https://demo.ikizen.dev/" });
+      expect(resolved.baseURL).toBe("https://demo.ikizen.dev/");
+      expect(resolved.trustedOrigins).toEqual([
+        "https://demo.ikizen.dev",
+        "https://flow-abc123.vercel.app",
+        "https://flow-git-staging.vercel.app",
+        "https://flow.example.com",
+      ]);
+    });
+
+    it("still requires a production secret", () => {
+      expect(() => resolveAuthEnv({ ...vercel, BETTER_AUTH_SECRET: undefined, VERCEL_ENV: "production" })).toThrow(/BETTER_AUTH_SECRET/);
+    });
   });
 });
 

@@ -9,7 +9,7 @@ import { systemClock } from "@/modules/shared-types";
 import { db } from "./db/client";
 import { account, session, user, verification } from "./db/schema";
 
-const { secret, baseURL } = resolveAuthEnv(process.env);
+const { secret, baseURL, trustedOrigins } = resolveAuthEnv(process.env);
 const provisionWorkspace = makeProvisionWorkspace({ workspaces: new DrizzleWorkspaceDirectory(db), clock: systemClock });
 
 /**
@@ -21,6 +21,7 @@ export const auth = betterAuth({
   appName: "Ikizen Flow",
   secret,
   baseURL,
+  trustedOrigins,
   database: drizzleAdapter(db, { provider: "sqlite", schema: { user, session, account, verification } }),
   emailAndPassword: { enabled: true, autoSignIn: true, minPasswordLength: 8 },
   session: { expiresIn: 60 * 60 * 24 * 30, updateAge: 60 * 60 * 24 },

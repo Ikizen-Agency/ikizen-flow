@@ -6,6 +6,7 @@ import { AuthCard, AuthCardSkeleton } from "@/modules/auth/ui/components/auth-ca
 import { FormAlert } from "@/modules/auth/ui/components/form-alert";
 import { LoginForm } from "@/modules/auth/ui/components/login-form";
 import { DEMO_USER } from "@/server/db/seed/data";
+import { isEphemeralDemo } from "@/shared/config/demo-mode";
 
 export const metadata: Metadata = { title: "Sign in" };
 
@@ -17,7 +18,8 @@ async function LoginScreen({ searchParams }: { searchParams: PageProps<"/login">
   const params = await searchParams;
   const next = safeNextPath(typeof params.next === "string" ? params.next : null);
   const error = typeof params.error === "string" ? ERRORS[params.error] : undefined;
-  const showDemo = process.env.NODE_ENV !== "production";
+  const hostedDemo = isEphemeralDemo(process.env);
+  const showDemo = hostedDemo || process.env.NODE_ENV !== "production";
 
   return (
     <AuthCard
@@ -35,8 +37,12 @@ async function LoginScreen({ searchParams }: { searchParams: PageProps<"/login">
       <div className="flex flex-col gap-space-md">
         {error ? <FormAlert message={error} /> : null}
         {showDemo ? (
-          <FormAlert tone="info" message={`Demo account (development only): ${DEMO_USER.email} / ${DEMO_USER.password}`} />
+          <FormAlert
+            tone="info"
+            message={`Demo account${hostedDemo ? "" : " (development only)"}: ${DEMO_USER.email} / ${DEMO_USER.password}`}
+          />
         ) : null}
+        {hostedDemo ? <p className="text-body-sm text-ink-subtle">Demo data resets periodically.</p> : null}
         <LoginForm next={next} />
       </div>
     </AuthCard>

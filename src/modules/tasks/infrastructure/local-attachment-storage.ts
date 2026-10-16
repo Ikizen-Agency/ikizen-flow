@@ -6,6 +6,7 @@
 import { randomUUID } from "node:crypto";
 import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { isAbsolute, join, resolve, sep } from "node:path";
+import { DEMO_UPLOADS_DIR, isEphemeralDemo } from "../../../shared/config/demo-mode";
 import type { AttachmentStorage } from "../application/ports";
 
 export class InvalidStorageKeyError extends Error {
@@ -17,10 +18,10 @@ export class InvalidStorageKeyError extends Error {
 
 const KEY = /^(\d{1,9})\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/;
 
-/** `UPLOADS_DIR` (absolute or relative to `cwd`), defaulting to `<cwd>/data/uploads`. */
+/** `UPLOADS_DIR` (absolute or relative to `cwd`), defaulting to `/tmp` in the ephemeral demo mode and `<cwd>/data/uploads` otherwise. */
 export function resolveUploadsDir(env: Readonly<Record<string, string | undefined>>, cwd: string = process.cwd()): string {
   const configured = env.UPLOADS_DIR?.trim();
-  if (!configured) return join(cwd, "data", "uploads");
+  if (!configured) return isEphemeralDemo(env) ? DEMO_UPLOADS_DIR : join(cwd, "data", "uploads");
   return isAbsolute(configured) ? resolve(configured) : resolve(cwd, configured);
 }
 
