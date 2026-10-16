@@ -17,7 +17,9 @@ jobs:
     runs-on: ubuntu-latest
     env:
       # Pinned Vercel CLI: it receives VERCEL_TOKEN, so never run whatever `latest` happens to be.
-      VERCEL_CLI: vercel@64.3.1
+      # Same major as the org's working landing-page pipeline; newer majors fail with "No teams available"
+      # unless an explicit --scope / VERCEL_ORG_ID is provided.
+      VERCEL_CLI: vercel@48.2.0
       # Runtime env of the hosted demo (ephemeral SQLite in /tmp) and Corepack so Vercel installs
       # the pnpm version pinned in package.json `packageManager` (pnpm 11, which reads `allowBuilds`).
       VERCEL_DEPLOY_FLAGS: >-
