@@ -178,7 +178,21 @@ Playwright builds the app and serves it on port 3520 (`E2E_PORT` to change it) a
 
 ## Deployment
 
-The app is deployed to [Vercel](https://vercel.com) through GitHub Actions on every push to `main`.
+The app is deployed to [Vercel](https://vercel.com) by GitHub Actions ([`.github/workflows/deploy-vercel.yml`](.github/workflows/deploy-vercel.yml)):
+
+- **Push to `main`** → production deployment (`vercel --prod`). **Push to `staging`** → preview deployment.
+- Every run first installs with the pinned pnpm (`packageManager`) on Node 22 and gates the deployment on `pnpm lint`, `pnpm typecheck`, `pnpm test` and `pnpm build`. Vercel then builds the app again remotely.
+- The CLI passes `ENABLE_EXPERIMENTAL_COREPACK=1` as a build variable, so Vercel installs pnpm 11 from `packageManager` (and honours `allowBuilds` in `pnpm-workspace.yaml`), plus the runtime variables `BETTER_AUTH_SECRET` and `IKIZEN_DEMO_MODE=ephemeral`.
+- Runs are serialized per branch, so deployments never overlap.
+
+Required GitHub secrets:
+
+| Secret | Scope | Purpose |
+| --- | --- | --- |
+| `VERCEL_TOKEN` | organization | Vercel access token used by the CLI |
+| `BETTER_AUTH_SECRET` | repository | Session signing secret, at least 32 characters (`openssl rand -base64 32`) |
+
+**Ephemeral demo data.** Vercel functions have no persistent disk, so the hosted demo runs in *ephemeral demo mode* (`IKIZEN_DEMO_MODE=ephemeral`, also on automatically when `VERCEL=1` and no `DATABASE_URL` is set). The SQLite database lives in `/tmp/ikizen.db` and attachments in `/tmp/ikizen-uploads`; the first query of each server instance applies the bundled `drizzle/` migrations and seeds the demo dataset. Everything visitors change is lost when the instance is recycled, and the login page shows the demo account with a "Demo data resets periodically" note. Better Auth uses `BETTER_AUTH_URL` when set, otherwise the production domain (`VERCEL_PROJECT_PRODUCTION_URL`) in production and the deployment URL in previews; deployment and branch URLs are trusted origins. Local development never enters this mode and keeps `pnpm db:reset`.
 
 Live demo: _coming soon_
 
@@ -190,16 +204,17 @@ Live demo: _coming soon_
 
 | Variable | Default | Notes |
 | --- | --- | --- |
-| `DATABASE_URL` | `file:./data/ikizen.db` | libSQL URL |
+| `DATABASE_URL` | `file:./data/ikizen.db` (`file:/tmp/ikizen.db` in demo mode) | libSQL URL |
+| `IKIZEN_DEMO_MODE` | unset | `ephemeral` enables the ephemeral demo mode (see [Deployment](#deployment)); also on when `VERCEL=1` without `DATABASE_URL` |
 | `BETTER_AUTH_SECRET` | development-only value | **Required in production**: at least 32 characters (`openssl rand -base64 32`). The server refuses to start without it. |
-| `BETTER_AUTH_URL` | `http://localhost:3000` | Public origin of the app; also used for links in emails |
+| `BETTER_AUTH_URL` | `http://localhost:3000` (Vercel URL on Vercel) | Public origin of the app; also used for links in emails |
 | `SMTP_HOST` | unset | When set, emails are delivered over SMTP. When unset, they are only recorded in the outbox as `logged`. |
 | `SMTP_PORT` | `587` | SMTP port |
 | `SMTP_SECURE` | `true` only on port 465 | Implicit TLS |
 | `SMTP_USER` / `SMTP_PASS` | unset | SMTP credentials (optional) |
 | `SMTP_FROM` | `Ikizen Flow <no-reply@ikizen.local>` | Sender address |
 | `SUPPORT_EMAIL` | `support@ikizen.local` | Recipient of the Help page contact form |
-| `UPLOADS_DIR` | `data/uploads` | Task attachment storage (absolute, or relative to the working directory) |
+| `UPLOADS_DIR` | `data/uploads` (`/tmp/ikizen-uploads` in demo mode) | Task attachment storage (absolute, or relative to the working directory) |
 
 ### Scripts
 
@@ -261,7 +276,7 @@ design/                 # Google Stitch design export (screens + DESIGN.md)
 - Signing out from an invitation link with the wrong account returns to `/login` without keeping the invitation.
 - Members cannot leave a workspace by themselves (an owner or admin removes them).
 - No SQLite busy timeout: truly simultaneous writes can rarely fail with `SQLITE_BUSY`.
-- Attachments are stored on the local disk, so a serverless deployment needs a persistent volume or an object-storage adapter.
+- The hosted demo is ephemeral: its SQLite database and attachments live in each Vercel instance's `/tmp`, so data resets when an instance is recycled, and concurrent instances do not share data (a session created on one instance is unknown to another). A persistent deployment needs a hosted libSQL database (`DATABASE_URL`) and an object-storage adapter for attachments.
 
 ---
 

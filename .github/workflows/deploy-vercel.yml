@@ -1,0 +1,55 @@
+name: CI/CD Deploy
+
+on:
+  push:
+    branches: [main, staging]
+
+# One deployment per branch at a time; a newer push waits instead of overlapping.
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      # Runtime env of the hosted demo (ephemeral SQLite in /tmp) and Corepack so Vercel installs
+      # the pnpm version pinned in package.json `packageManager` (pnpm 11, which reads `allowBuilds`).
+      VERCEL_DEPLOY_FLAGS: >-
+        --yes
+        --build-env ENABLE_EXPERIMENTAL_COREPACK=1
+        --env IKIZEN_DEMO_MODE=ephemeral
+    steps:
+      - uses: actions/checkout@v4
+
+      # Reads the pnpm version from package.json `packageManager`.
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test
+      # Vercel builds again remotely; this build only gates the deployment on build errors.
+      - run: pnpm build
+
+      - name: Deploy to Vercel (Production)
+        if: github.ref == 'refs/heads/main'
+        run: npx vercel --prod $VERCEL_DEPLOY_FLAGS --env BETTER_AUTH_SECRET="$BETTER_AUTH_SECRET" --token="$VERCEL_TOKEN"
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET }}
+
+      - name: Deploy to Vercel (Staging)
+        if: github.ref == 'refs/heads/staging'
+        run: npx vercel $VERCEL_DEPLOY_FLAGS --env STAGING=true --env BETTER_AUTH_SECRET="$BETTER_AUTH_SECRET" --token="$VERCEL_TOKEN"
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET }}
