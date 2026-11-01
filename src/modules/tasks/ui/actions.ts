@@ -245,7 +245,7 @@ export async function deleteCommentAction(_prev: TaskMutationResult, formData: F
   return { ok: true };
 }
 
-/** Attachment upload (multipart FormData `file`): validated in the domain, stored on disk, recorded per task. */
+/** Attachment upload (multipart FormData `file`): validated in the domain, stored by the attachment storage, recorded per task. */
 export async function uploadAttachmentAction(_prev: TaskMutationResult, formData: FormData): Promise<TaskMutationResult> {
   const { ctx, app } = await getWorkspaceApp();
   const parsed = taskIdSchema.safeParse(textEntries(formData));

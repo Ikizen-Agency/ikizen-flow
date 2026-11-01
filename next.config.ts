@@ -9,8 +9,9 @@ const nextConfig: NextConfig = {
     "/**": ["./drizzle/**/*"],
   },
   experimental: {
-    // Task attachments allow 10 MB files; leave room for multipart overhead (Server Actions default to 1 MB).
-    serverActions: { bodySizeLimit: "11mb" },
+    // Task attachments allow 4 MB files; leave room for multipart overhead (Server Actions default to 1 MB)
+    // while staying under Vercel's 4.5 MB function body limit.
+    serverActions: { bodySizeLimit: "4.25mb" },
   },
   turbopack: {
     rules: {

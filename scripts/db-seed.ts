@@ -1,6 +1,6 @@
 import { createDatabase } from "../src/server/db/connect";
-import { databaseTarget, decideSeed } from "../src/server/db/database-target";
-import { LocalAttachmentStorage, resolveUploadsDir } from "../src/modules/tasks/infrastructure/local-attachment-storage";
+import { databaseTarget, decideSeed, seedStorageEnv } from "../src/server/db/database-target";
+import { createAttachmentStorage } from "../src/modules/tasks/infrastructure/attachment-storage";
 import { seedDatabase } from "../src/server/db/seed/seed";
 import { loadDatabaseUrl } from "./env";
 
@@ -13,7 +13,7 @@ if (!decision.allowed) {
 
 const { db, client } = createDatabase(url);
 // Seeded attachments are rewritten from scratch; files of the previous dataset are removed first.
-const attachmentStorage = new LocalAttachmentStorage(resolveUploadsDir(process.env));
+const attachmentStorage = createAttachmentStorage(seedStorageEnv(url, process.env));
 await attachmentStorage.clear();
 const summary = await seedDatabase(db, new Date(), { attachmentStorage });
 client.close();

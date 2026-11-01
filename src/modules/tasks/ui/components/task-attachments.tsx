@@ -3,7 +3,7 @@
 import { useActionState, useRef, useState } from "react";
 import { ConfirmDialog } from "@/shared/ui/dialog";
 import { Icon } from "@/shared/ui/icon";
-import { ATTACHMENT_ACCEPT, AttachmentRejectedError, validateAttachment } from "../../domain/attachment";
+import { ATTACHMENT_ACCEPT, AttachmentRejectedError, MAX_ATTACHMENT_BYTES, validateAttachment } from "../../domain/attachment";
 import { deleteAttachmentAction, uploadAttachmentAction } from "../actions";
 import type { TaskMutationResult } from "../form-schema";
 
@@ -74,7 +74,7 @@ export function TaskAttachments({ taskId, attachments, inputId }: TaskAttachment
           </label>
         </form>
       </div>
-      <p className="mt-1 text-label-sm text-ink-subtle">Images, PDF, text, Office documents or zip, up to 10 MB.</p>
+      <p className="mt-1 text-label-sm text-ink-subtle">Images, PDF, text, Office documents or zip, up to {MAX_ATTACHMENT_BYTES / (1024 * 1024)} MB.</p>
       {error ? (
         <p role="alert" className="mt-space-sm text-body-sm text-danger-strong">
           {error}

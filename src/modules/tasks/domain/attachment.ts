@@ -3,7 +3,8 @@
  * derived from the extension, never taken from the client, and downloads are always `attachment`.
  */
 
-export const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
+// Fits inside the 4.5 MB request and response body limit of Vercel functions, on every host for simplicity.
+export const MAX_ATTACHMENT_BYTES = 4 * 1024 * 1024;
 export const FILE_NAME_MAX_LENGTH = 120;
 
 /** Allowed extensions -> MIME type: images, PDF, text, office documents and zip archives. */

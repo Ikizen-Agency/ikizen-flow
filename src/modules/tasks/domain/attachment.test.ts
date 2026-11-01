@@ -40,7 +40,7 @@ describe("validateAttachment", () => {
 
   it("rejects empty, oversized and non-allowlisted files", () => {
     expect(() => validateAttachment({ name: "a.txt", size: 0 })).toThrow(AttachmentRejectedError);
-    expect(() => validateAttachment({ name: "a.pdf", size: MAX_ATTACHMENT_BYTES + 1 })).toThrow(/10 MB/);
+    expect(() => validateAttachment({ name: "a.pdf", size: MAX_ATTACHMENT_BYTES + 1 })).toThrow(/4 MB/);
     expect(validateAttachment({ name: "a.pdf", size: MAX_ATTACHMENT_BYTES }).sizeBytes).toBe(MAX_ATTACHMENT_BYTES);
     for (const name of ["run.exe", "page.html", "logo.svg", "script.js", "noextension"]) {
       expect(() => validateAttachment({ name, size: 10 })).toThrow(AttachmentRejectedError);

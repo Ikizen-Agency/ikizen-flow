@@ -86,7 +86,7 @@ describe("task attachments", () => {
     const d = north();
     const [task] = await d.tasks.listBoard({});
     await expect(makeUploadTaskAttachment(d)(task!.id, file("payload.html", "<script>"), null)).rejects.toThrow(AttachmentRejectedError);
-    await expect(makeUploadTaskAttachment(d)(task!.id, { name: "big.pdf", size: 11 * 1024 * 1024, bytes: new Uint8Array(1) }, null)).rejects.toThrow(/10 MB/);
+    await expect(makeUploadTaskAttachment(d)(task!.id, { name: "big.pdf", size: 11 * 1024 * 1024, bytes: new Uint8Array(1) }, null)).rejects.toThrow(/4 MB/);
   });
 
   it("removes stored files when the task is deleted", async () => {

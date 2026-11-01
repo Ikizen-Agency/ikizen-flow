@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CONFIRM_REMOTE_SEED_VAR, databaseTarget, decideSeed, isRemoteDatabaseUrl } from "./database-target";
+import { CONFIRM_REMOTE_SEED_VAR, databaseTarget, decideSeed, isRemoteDatabaseUrl, seedStorageEnv } from "./database-target";
 
 const REMOTE = "libsql://flow-acme.turso.io";
 
@@ -50,7 +50,14 @@ describe("decideSeed", () => {
   });
 
   it("allows a remote database when the confirmation equals the target host", () => {
-    expect(decideSeed(REMOTE, { [CONFIRM_REMOTE_SEED_VAR]: "flow-acme.turso.io" })).toEqual({ allowed: true });
+    expect(decideSeed(REMOTE, { [CONFIRM_REMOTE_SEED_VAR]: "flow-acme.turso.io", BLOB_READ_WRITE_TOKEN: "test-token" })).toEqual({ allowed: true });
+  });
+
+  it("refuses a confirmed remote seed without Blob, whose attachments would stay on this machine", () => {
+    const decision = decideSeed(REMOTE, { [CONFIRM_REMOTE_SEED_VAR]: "flow-acme.turso.io" });
+    expect(decision.allowed).toBe(false);
+    if (decision.allowed) return;
+    expect(decision.reason).toContain("BLOB_READ_WRITE_TOKEN");
   });
 
   it("cannot be confirmed when the URL has no recognizable host", () => {
@@ -61,5 +68,15 @@ describe("decideSeed", () => {
   it("does not leak credentials in the refusal", () => {
     const decision = decideSeed("libsql://admin:hunter2@flow-acme.turso.io?authToken=secret-token", {});
     expect(JSON.stringify(decision)).not.toMatch(/hunter2|secret-token/);
+  });
+});
+
+describe("seedStorageEnv", () => {
+  it("keeps the Blob token for a remote database", () => {
+    expect(seedStorageEnv(REMOTE, { BLOB_READ_WRITE_TOKEN: "test-token" }).BLOB_READ_WRITE_TOKEN).toBe("test-token");
+  });
+
+  it("drops the Blob token for a local database, so a local seed never clears the shared store", () => {
+    expect(seedStorageEnv("file:./data/ikizen.db", { BLOB_READ_WRITE_TOKEN: "test-token", UPLOADS_DIR: "/srv/files" })).toEqual({ UPLOADS_DIR: "/srv/files" });
   });
 });

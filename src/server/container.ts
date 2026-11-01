@@ -85,7 +85,7 @@ import { makeAddTaskComment, makeDeleteTaskComment, makeEditTaskComment, makeLis
 import { DrizzleTaskAttachmentRepository } from "@/modules/tasks/infrastructure/drizzle-task-attachment-repository";
 import { DrizzleTaskCommentRepository } from "@/modules/tasks/infrastructure/drizzle-task-comment-repository";
 import { DrizzleTaskTimeEntryRepository } from "@/modules/tasks/infrastructure/drizzle-task-time-entry-repository";
-import { LocalAttachmentStorage, resolveUploadsDir } from "@/modules/tasks/infrastructure/local-attachment-storage";
+import { createAttachmentStorage } from "@/modules/tasks/infrastructure/attachment-storage";
 import { DrizzleTaskRepository } from "@/modules/tasks/infrastructure/drizzle-task-repository";
 import { resolveAuthEnv } from "@/modules/auth/domain/auth-env";
 import {
@@ -115,7 +115,7 @@ const mailer = createMailer(mailerConfig);
 /** Public origin for links in emails (invitations, notifications, invoices). */
 const appBaseUrl = resolveAuthEnv(process.env).baseURL;
 /** Task attachment bytes on local disk: `UPLOADS_DIR` or `data/uploads`, one folder per workspace. */
-const attachmentStorage = new LocalAttachmentStorage(resolveUploadsDir(process.env));
+const attachmentStorage = createAttachmentStorage(process.env);
 
 /**
  * Composition root: the only place that knows which adapters implement each port.
