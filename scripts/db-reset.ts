@@ -1,6 +1,7 @@
 import { rmSync } from "node:fs";
 import { migrate } from "drizzle-orm/libsql/migrator";
 import { createDatabase } from "../src/server/db/connect";
+import { databaseTarget } from "../src/server/db/database-target";
 import { LocalAttachmentStorage, resolveUploadsDir } from "../src/modules/tasks/infrastructure/local-attachment-storage";
 import { seedDatabase } from "../src/server/db/seed/seed";
 import { loadDatabaseUrl, localFilePath } from "./env";
@@ -20,4 +21,4 @@ const attachmentStorage = new LocalAttachmentStorage(resolveUploadsDir(process.e
 await attachmentStorage.clear();
 const summary = await seedDatabase(db, new Date(), { attachmentStorage });
 client.close();
-console.log(`Reset ${url}:`, summary);
+console.log(`Reset ${databaseTarget(url)}:`, summary);
