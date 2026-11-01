@@ -1,0 +1,43 @@
+name: Reset Demo Data
+
+# The production demo publishes its credentials, so visitors can change or delete shared data.
+# Reseeding restores it and keeps the seeded dates current.
+on:
+  schedule:
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+
+# Shares the production deployment group: a reset never overlaps a migration.
+concurrency:
+  group: deploy-refs/heads/main
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  reset:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Reads the pnpm version from package.json `packageManager`. Pinned to the v4 commit (third-party action).
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # The confirmation host is derived here so this job can only reset the configured database.
+      - name: Reseed production demo
+        run: |
+          host="${DATABASE_URL#*://}"
+          export IKIZEN_CONFIRM_REMOTE_SEED="${host%%[/?]*}"
+          pnpm db:seed
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DATABASE_AUTH_TOKEN: ${{ secrets.DATABASE_AUTH_TOKEN }}
+          BLOB_READ_WRITE_TOKEN: ${{ secrets.BLOB_READ_WRITE_TOKEN }}

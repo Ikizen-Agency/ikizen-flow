@@ -12,6 +12,8 @@ if (!decision.allowed) {
 }
 
 const { db, client } = createDatabase(url);
+// Fails on bad credentials or a missing migration before anything is deleted.
+await client.execute('select 1 from "user" limit 1');
 // Seeded attachments are rewritten from scratch; files of the previous dataset are removed first.
 const attachmentStorage = createAttachmentStorage(seedStorageEnv(url, process.env));
 await attachmentStorage.clear();

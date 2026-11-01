@@ -114,7 +114,7 @@ const mailerConfig = resolveMailerConfig(process.env);
 const mailer = createMailer(mailerConfig);
 /** Public origin for links in emails (invitations, notifications, invoices). */
 const appBaseUrl = resolveAuthEnv(process.env).baseURL;
-/** Task attachment bytes on local disk: `UPLOADS_DIR` or `data/uploads`, one folder per workspace. */
+/** Task attachment bytes: private Vercel Blob with `BLOB_READ_WRITE_TOKEN`, otherwise the local disk. */
 const attachmentStorage = createAttachmentStorage(process.env);
 
 /**

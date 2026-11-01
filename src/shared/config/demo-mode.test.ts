@@ -52,12 +52,12 @@ describe("demoLoginNotice", () => {
     expect(demoLoginNotice({ ...production, IKIZEN_SHOW_DEMO_LOGIN: "1" })).toBeNull();
   });
 
-  it("shows the persistent demo account when enabled, without the reset note", () => {
+  it("shows the hosted demo account when enabled, with the reset note", () => {
     const env = { ...production, DATABASE_URL: "libsql://flow.turso.io", IKIZEN_SHOW_DEMO_LOGIN: "true" };
-    expect(demoLoginNotice(env)).toEqual({ developmentOnly: false, resets: false });
+    expect(demoLoginNotice(env)).toEqual({ developmentOnly: false, resets: true });
   });
 
-  it("warns that data resets only in the ephemeral demo", () => {
+  it("warns that data resets in the ephemeral demo", () => {
     expect(demoLoginNotice({ ...production, IKIZEN_DEMO_MODE: "ephemeral" })).toEqual({ developmentOnly: false, resets: true });
   });
 
