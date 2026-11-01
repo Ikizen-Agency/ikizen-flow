@@ -17,3 +17,18 @@ export function isEphemeralDemo(env: Readonly<Record<string, string | undefined>
   if (env.IKIZEN_DEMO_MODE?.trim() === "ephemeral") return true;
   return env.VERCEL === "1" && !databaseUrl;
 }
+
+export interface DemoLoginNotice {
+  /** The account only exists on a local database: label it as such. */
+  developmentOnly: boolean;
+  /** The data is ephemeral: tell visitors it resets. */
+  resets: boolean;
+}
+
+/** What the login page says about the demo account: on in demo mode, with `IKIZEN_SHOW_DEMO_LOGIN=true`, and in local development. */
+export function demoLoginNotice(env: Readonly<Record<string, string | undefined>>): DemoLoginNotice | null {
+  const ephemeral = isEphemeralDemo(env);
+  const hosted = ephemeral || env.IKIZEN_SHOW_DEMO_LOGIN?.trim() === "true";
+  if (!hosted && env.NODE_ENV === "production") return null;
+  return { developmentOnly: !hosted, resets: ephemeral };
+}

@@ -182,17 +182,35 @@ The app is deployed to [Vercel](https://vercel.com) by GitHub Actions ([`.github
 
 - **Push to `main`** → production deployment (`vercel --prod`). **Push to `staging`** → preview deployment.
 - Every run first installs with the pinned pnpm (`packageManager`) on Node 22 and gates the deployment on `pnpm lint`, `pnpm typecheck`, `pnpm test` and `pnpm build`. Vercel then builds the app again remotely.
-- The CLI passes `ENABLE_EXPERIMENTAL_COREPACK=1` as a build variable, so Vercel installs pnpm 11 from `packageManager` (and honours `allowBuilds` in `pnpm-workspace.yaml`), plus the runtime variables `BETTER_AUTH_SECRET` and `IKIZEN_DEMO_MODE=ephemeral`.
+- The CLI passes `ENABLE_EXPERIMENTAL_COREPACK=1` as a build variable, so Vercel installs pnpm 11 from `packageManager` (and honours `allowBuilds` in `pnpm-workspace.yaml`).
 - Runs are serialized per branch, so deployments never overlap.
 
-Required GitHub secrets:
+**Production** keeps its data in a [Turso](https://turso.tech) database and its attachments in a private [Vercel Blob](https://vercel.com/docs/vercel-blob) store, shared by every function instance. A `main` run first fails if any value below is empty, then runs `pnpm db:migrate` after the quality gates (a failed migration stops the job before deploying), and passes `DATABASE_URL`, `DATABASE_AUTH_TOKEN`, `BLOB_READ_WRITE_TOKEN`, `BETTER_AUTH_SECRET` and `IKIZEN_SHOW_DEMO_LOGIN=true` to the deployment. Blobs stay private: downloads go through the authenticated attachment route. Attachments are limited to 4 MB everywhere, which fits Vercel's 4.5 MB function body limit. Emails stay `logged` without SMTP.
 
-| Secret | Scope | Purpose |
-| --- | --- | --- |
-| `VERCEL_TOKEN` | organization | Vercel access token used by the CLI |
-| `BETTER_AUTH_SECRET` | repository | Session signing secret, at least 32 characters (`openssl rand -base64 32`) |
+| GitHub setting | Kind | Scope | Purpose |
+| --- | --- | --- | --- |
+| `VERCEL_TOKEN` | secret | organization | Vercel access token used by the CLI |
+| `VERCEL_ORG_ID` / `VERCEL_PROJECT_ID` | variable | repository | Explicit project link for the CLI |
+| `BETTER_AUTH_SECRET` | secret | repository | Session signing secret, at least 32 characters (`openssl rand -base64 32`) |
+| `DATABASE_URL` | secret | repository | Turso URL, `libsql://<database>.turso.io` (no token in the URL) |
+| `DATABASE_AUTH_TOKEN` | secret | repository | Turso token |
+| `BLOB_READ_WRITE_TOKEN` | secret | repository | Read-write token of the Blob store, created with private access |
 
-**Ephemeral demo data.** Vercel functions have no persistent disk, so the hosted demo runs in *ephemeral demo mode* (`IKIZEN_DEMO_MODE=ephemeral`, also on automatically when `VERCEL=1` and no `DATABASE_URL` is set). The SQLite database lives in `/tmp/ikizen.db` and attachments in `/tmp/ikizen-uploads`; the first query of each server instance applies the bundled `drizzle/` migrations and seeds the demo dataset. Everything visitors change is lost when the instance is recycled, and the login page shows the demo account with a "Demo data resets periodically" note. Better Auth uses `BETTER_AUTH_URL` when set, otherwise the production domain (`VERCEL_PROJECT_PRODUCTION_URL`) in production and the deployment URL in previews; deployment and branch URLs are trusted origins. Local development never enters this mode and keeps `pnpm db:reset`.
+Set them in GitHub only. Keep the same values out of the Vercel project's Preview environment, and keep `BLOB_READ_WRITE_TOKEN` out of your local `.env`: the app would then write to the production store.
+
+**Seeding a new production database.** Run this once, after the first migration. It deletes every row and every attachment blob, then writes the demo dataset, so `pnpm db:seed` refuses a remote `DATABASE_URL` unless `IKIZEN_CONFIRM_REMOTE_SEED` equals its exact host, and needs `BLOB_READ_WRITE_TOKEN` so seeded attachments are readable in production. A seed that fails halfway is not rolled back: run it again.
+
+```bash
+export DATABASE_URL='libsql://<database>.turso.io' DATABASE_AUTH_TOKEN='<token>' BLOB_READ_WRITE_TOKEN='<token>'
+pnpm db:migrate
+IKIZEN_CONFIRM_REMOTE_SEED='<database>.turso.io' pnpm db:seed
+```
+
+`pnpm db:reset` only works on local file databases. The scripts print the database host, never credentials.
+
+**Staging** is an ephemeral demo and never touches production. It deploys with `IKIZEN_DEMO_MODE=ephemeral`, never migrates, receives no production secret, and signs sessions with a secret generated per deployment. The SQLite database lives in `/tmp/ikizen.db` and attachments in `/tmp/ikizen-uploads`; the first query of each server instance applies the bundled `drizzle/` migrations and seeds the demo dataset. Everything visitors change is lost when the instance is recycled, instances do not share data, and the login page shows the demo account with a "Demo data resets periodically" note. Demo mode is also on automatically when `VERCEL=1` and no `DATABASE_URL` is set. Local development never enters this mode and keeps `pnpm db:reset`.
+
+Better Auth uses `BETTER_AUTH_URL` when set, otherwise the production domain (`VERCEL_PROJECT_PRODUCTION_URL`) in production and the deployment URL in previews; deployment and branch URLs are trusted origins.
 
 Live demo: _coming soon_
 
@@ -204,8 +222,11 @@ Live demo: _coming soon_
 
 | Variable | Default | Notes |
 | --- | --- | --- |
-| `DATABASE_URL` | `file:./data/ikizen.db` (`file:/tmp/ikizen.db` in demo mode) | libSQL URL |
+| `DATABASE_URL` | `file:./data/ikizen.db` (`file:/tmp/ikizen.db` in demo mode) | libSQL URL, local (`file:`) or remote (`libsql://`) |
+| `DATABASE_AUTH_TOKEN` | unset | Token of a remote libSQL database; never put it in the URL |
 | `IKIZEN_DEMO_MODE` | unset | `ephemeral` enables the ephemeral demo mode (see [Deployment](#deployment)); also on when `VERCEL=1` without `DATABASE_URL` |
+| `IKIZEN_SHOW_DEMO_LOGIN` | unset | `true` shows the demo account on the login page of a production deployment |
+| `IKIZEN_CONFIRM_REMOTE_SEED` | unset | Lets `pnpm db:seed` wipe a remote database; must equal its exact host |
 | `BETTER_AUTH_SECRET` | development-only value | **Required in production**: at least 32 characters (`openssl rand -base64 32`). The server refuses to start without it. |
 | `BETTER_AUTH_URL` | `http://localhost:3000` (Vercel URL on Vercel) | Public origin of the app; also used for links in emails |
 | `SMTP_HOST` | unset | When set, emails are delivered over SMTP. When unset, they are only recorded in the outbox as `logged`. |
@@ -215,6 +236,7 @@ Live demo: _coming soon_
 | `SMTP_FROM` | `Ikizen Flow <no-reply@ikizen.local>` | Sender address |
 | `SUPPORT_EMAIL` | `support@ikizen.local` | Recipient of the Help page contact form |
 | `UPLOADS_DIR` | `data/uploads` (`/tmp/ikizen-uploads` in demo mode) | Task attachment storage (absolute, or relative to the working directory) |
+| `BLOB_READ_WRITE_TOKEN` | unset | When set, attachments live in private Vercel Blob instead of `UPLOADS_DIR` (ignored in demo mode) |
 
 ### Scripts
 
@@ -276,7 +298,8 @@ design/                 # Google Stitch design export (screens + DESIGN.md)
 - Signing out from an invitation link with the wrong account returns to `/login` without keeping the invitation.
 - Members cannot leave a workspace by themselves (an owner or admin removes them).
 - No SQLite busy timeout: truly simultaneous writes can rarely fail with `SQLITE_BUSY`.
-- The hosted demo is ephemeral: its SQLite database and attachments live in each Vercel instance's `/tmp`, so data resets when an instance is recycled, and concurrent instances do not share data (a session created on one instance is unknown to another). A persistent deployment needs a hosted libSQL database (`DATABASE_URL`) and an object-storage adapter for attachments.
+- Attachments are limited to 4 MB, because uploads and downloads pass through a Vercel function.
+- `pnpm db:seed` is not transactional: a remote seed that fails halfway must be run again.
 
 ---
 

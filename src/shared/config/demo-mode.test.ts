@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { resolveDatabaseUrl } from "@/server/db/connect";
 import { resolveUploadsDir } from "@/modules/tasks/infrastructure/local-attachment-storage";
-import { DEMO_DATABASE_URL, DEMO_UPLOADS_DIR, isEphemeralDemo } from "./demo-mode";
+import { DEMO_DATABASE_URL, DEMO_UPLOADS_DIR, demoLoginNotice, isEphemeralDemo } from "./demo-mode";
 
 describe("isEphemeralDemo", () => {
   it("is off by default and for local development", () => {
@@ -40,5 +40,28 @@ describe("demo storage defaults", () => {
     expect(resolveUploadsDir({ IKIZEN_DEMO_MODE: "ephemeral", UPLOADS_DIR: "/srv/files" }, "/var/task")).toBe("/srv/files");
     expect(resolveDatabaseUrl({})).toBe("file:./data/ikizen.db");
     expect(resolveUploadsDir({}, "/srv/app")).toBe("/srv/app/data/uploads");
+  });
+});
+
+describe("demoLoginNotice", () => {
+  const production = { NODE_ENV: "production" };
+
+  it("stays hidden on a production deployment by default", () => {
+    expect(demoLoginNotice({ ...production, DATABASE_URL: "libsql://flow.turso.io" })).toBeNull();
+    expect(demoLoginNotice({ ...production, IKIZEN_SHOW_DEMO_LOGIN: "false" })).toBeNull();
+    expect(demoLoginNotice({ ...production, IKIZEN_SHOW_DEMO_LOGIN: "1" })).toBeNull();
+  });
+
+  it("shows the persistent demo account when enabled, without the reset note", () => {
+    const env = { ...production, DATABASE_URL: "libsql://flow.turso.io", IKIZEN_SHOW_DEMO_LOGIN: "true" };
+    expect(demoLoginNotice(env)).toEqual({ developmentOnly: false, resets: false });
+  });
+
+  it("warns that data resets only in the ephemeral demo", () => {
+    expect(demoLoginNotice({ ...production, IKIZEN_DEMO_MODE: "ephemeral" })).toEqual({ developmentOnly: false, resets: true });
+  });
+
+  it("labels the account as development only outside production", () => {
+    expect(demoLoginNotice({ NODE_ENV: "development" })).toEqual({ developmentOnly: true, resets: false });
   });
 });

@@ -21,13 +21,31 @@ jobs:
       # Explicit link: the CLI skips scope discovery, which fails when the token lists no teams.
       VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
       VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
-      # Runtime env of the hosted demo (ephemeral SQLite in /tmp) and Corepack so Vercel installs
-      # the pnpm version pinned in package.json `packageManager` (pnpm 11, which reads `allowBuilds`).
+      # Corepack so Vercel installs the pnpm version pinned in package.json `packageManager`
+      # (pnpm 11, which reads `allowBuilds`). Runtime env is set per deployment below.
       VERCEL_DEPLOY_FLAGS: >-
         --yes
         --build-env ENABLE_EXPERIMENTAL_COREPACK=1
-        --env IKIZEN_DEMO_MODE=ephemeral
     steps:
+      # Fails before any work when production is not fully configured. Prints names, never values.
+      - name: Check production configuration
+        if: github.ref == 'refs/heads/main'
+        run: |
+          missing=0
+          for name in VERCEL_ORG_ID VERCEL_PROJECT_ID VERCEL_TOKEN DATABASE_URL DATABASE_AUTH_TOKEN BLOB_READ_WRITE_TOKEN BETTER_AUTH_SECRET; do
+            if [ -z "${!name}" ]; then
+              echo "::error::Missing required configuration: $name"
+              missing=1
+            fi
+          done
+          exit "$missing"
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DATABASE_AUTH_TOKEN: ${{ secrets.DATABASE_AUTH_TOKEN }}
+          BLOB_READ_WRITE_TOKEN: ${{ secrets.BLOB_READ_WRITE_TOKEN }}
+          BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET }}
+
       - uses: actions/checkout@v4
 
       # Reads the pnpm version from package.json `packageManager`. Pinned to the v4 commit (third-party action).
@@ -45,16 +63,38 @@ jobs:
       # Vercel builds again remotely; this build only gates the deployment on build errors.
       - run: pnpm build
 
+      # Production only, before the deployment: a failed migration stops the job and the previous deployment keeps serving.
+      - name: Migrate production database
+        if: github.ref == 'refs/heads/main'
+        run: pnpm db:migrate
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DATABASE_AUTH_TOKEN: ${{ secrets.DATABASE_AUTH_TOKEN }}
+
       - name: Deploy to Vercel (Production)
         if: github.ref == 'refs/heads/main'
-        run: npx --yes "$VERCEL_CLI" --prod $VERCEL_DEPLOY_FLAGS --env BETTER_AUTH_SECRET="$BETTER_AUTH_SECRET" --token="$VERCEL_TOKEN"
+        run: >-
+          npx --yes "$VERCEL_CLI" --prod $VERCEL_DEPLOY_FLAGS
+          --env DATABASE_URL="$DATABASE_URL"
+          --env DATABASE_AUTH_TOKEN="$DATABASE_AUTH_TOKEN"
+          --env BLOB_READ_WRITE_TOKEN="$BLOB_READ_WRITE_TOKEN"
+          --env BETTER_AUTH_SECRET="$BETTER_AUTH_SECRET"
+          --env IKIZEN_SHOW_DEMO_LOGIN=true
+          --token="$VERCEL_TOKEN"
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DATABASE_AUTH_TOKEN: ${{ secrets.DATABASE_AUTH_TOKEN }}
+          BLOB_READ_WRITE_TOKEN: ${{ secrets.BLOB_READ_WRITE_TOKEN }}
           BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET }}
 
+      # Staging is the disposable ephemeral demo. It pins its own /tmp database and signs sessions with a
+      # per-deployment secret, so it never receives a production secret; the Vercel token only deploys.
       - name: Deploy to Vercel (Staging)
         if: github.ref == 'refs/heads/staging'
-        run: npx --yes "$VERCEL_CLI" $VERCEL_DEPLOY_FLAGS --env STAGING=true --env BETTER_AUTH_SECRET="$BETTER_AUTH_SECRET" --token="$VERCEL_TOKEN"
+        run: |
+          BETTER_AUTH_SECRET="$(openssl rand -base64 32)"
+          echo "::add-mask::$BETTER_AUTH_SECRET"
+          npx --yes "$VERCEL_CLI" $VERCEL_DEPLOY_FLAGS --env STAGING=true --env IKIZEN_DEMO_MODE=ephemeral --env DATABASE_URL=file:/tmp/ikizen.db --env BETTER_AUTH_SECRET="$BETTER_AUTH_SECRET" --token="$VERCEL_TOKEN"
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET }}
