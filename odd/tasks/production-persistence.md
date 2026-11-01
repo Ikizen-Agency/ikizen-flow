@@ -21,7 +21,7 @@ The user chose a shared Turso database on 2026-11-01 and asked for the deploymen
 - Demo credentials visible on the hosted login.
 - README deployment documentation.
 
-Out of scope: real email delivery (SMTP stays optional, emails stay `logged`), direct client uploads, periodic demo data reset.
+Out of scope: real email delivery (SMTP stays optional, emails stay `logged`), direct client uploads.
 
 ## Constraints
 
@@ -42,7 +42,7 @@ Out of scope: real email delivery (SMTP stays optional, emails stay `logged`), d
 - [x] T3 Deployment workflow and hosted login. Route: delegated (workflow, login and docs together).
   - Acceptance: main migrates before deploying and passes the new runtime env; staging stays ephemeral; the login shows demo credentials when enabled; README documents setup.
   - Checks: unit test for the login flag, YAML parse, `pnpm build`.
-- [ ] T4 Provision and verify production. Route: inline (external actions).
+- [x] T4 Provision and verify production. Route: inline (external actions).
   - Acceptance: Turso and Blob are provisioned, the database is seeded once, and Chromium completes login, navigation across all sections, a persisted create and an attachment round trip on production. Foreign key enforcement is confirmed on Turso.
 
 ## Progress
@@ -52,8 +52,10 @@ Out of scope: real email delivery (SMTP stays optional, emails stay `logged`), d
 - T3 done in `720455a`. RED: 4 `demoLoginNotice` tests; GREEN 10 tests in `demo-mode.test.ts`. Exception: the workflow has no runnable RED, so it was checked by parsing the YAML, reviewing the parsed steps and running the guard loop in bash with two empty values (exit 1, names only).
 - Added to the plan during T1 to T3: remote seed refuses without `BLOB_READ_WRITE_TOKEN`; a local seed drops that token; the factory stays local in demo mode; staging pins `DATABASE_URL=file:/tmp/ikizen.db` and uses a per-deployment `BETTER_AUTH_SECRET`.
 - Final checks on `720455a`: `pnpm lint` clean, `pnpm typecheck` clean, `pnpm test` 486 passed in 73 files, `pnpm build` succeeded, `pnpm test:e2e` 1 passed with `PLAYWRIGHT_CHROMIUM_PATH=/usr/bin/chromium` (the bundled headless shell 1248 is not installed here).
-- Pending: `.env.example` needs the new variables by hand. Remote behaviour (Turso, Blob) is unproven until T4.
+- Added after review: daily demo reset `.github/workflows/reset-demo.yml` and a seed preflight (`1fcde5c`, `311d06f`), because the hosted login publishes shared credentials.
+- T4 done on `311d06f`, production run 41351259956. Turso Starter (iad1) and a private Blob store were provisioned for Production. Chromium on https://ikizen-flow.vercel.app: login, 3 rounds across 7 sections with no redirect to `/login`, a created customer visible in 5 of 5 reads, an uploaded attachment downloaded intact with `nosniff`, 0 page errors. `pragma foreign_keys` returned 1 on Turso. 12 concurrent `get-session` calls returned the user 12 times. Reset run 41351716506 succeeded and removed the test customer; login still worked.
+- Pending: `.env.example` needs the new variables by hand. Accepted advisories: a reset can overlap a deployment migration, it migrates `main` regardless of deployment state, and a failed seed is not retried.
 
 ## Next step
 
-T4: provision Turso and Blob, set the GitHub secrets, seed once, and verify production in Chromium.
+None. Feature complete.
