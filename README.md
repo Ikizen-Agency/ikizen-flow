@@ -208,7 +208,7 @@ IKIZEN_CONFIRM_REMOTE_SEED='<database>.turso.io' pnpm db:seed
 
 `pnpm db:reset` only works on local file databases. The scripts print the database host, never credentials.
 
-**Daily demo reset.** The hosted login publishes the demo account, so `.github/workflows/reset-demo.yml` reseeds production every day at 06:00 UTC and on manual dispatch. Anything visitors create disappears at that point. GitHub pauses scheduled workflows after 60 days without repository activity; re-enable it from the Actions tab.
+**Daily demo reset.** The hosted login publishes the demo account, so `.github/workflows/reset-demo.yml` migrates and reseeds production every day at 06:00 UTC and on manual dispatch from `main`. Anything visitors create disappears at that point. GitHub pauses scheduled workflows after 60 days without repository activity; re-enable it from the Actions tab.
 
 **Staging** is an ephemeral demo and never touches production. It deploys with `IKIZEN_DEMO_MODE=ephemeral`, never migrates, receives no production secret, and signs sessions with a secret generated per deployment. The SQLite database lives in `/tmp/ikizen.db` and attachments in `/tmp/ikizen-uploads`; the first query of each server instance applies the bundled `drizzle/` migrations and seeds the demo dataset. Everything visitors change is lost when the instance is recycled, instances do not share data, and the login page shows the demo account with a "Demo data resets periodically" note. Demo mode is also on automatically when `VERCEL=1` and no `DATABASE_URL` is set. Local development never enters this mode and keeps `pnpm db:reset`.
 
@@ -301,7 +301,7 @@ design/                 # Google Stitch design export (screens + DESIGN.md)
 - Members cannot leave a workspace by themselves (an owner or admin removes them).
 - No SQLite busy timeout: truly simultaneous writes can rarely fail with `SQLITE_BUSY`.
 - Attachments are limited to 4 MB, because uploads and downloads pass through a Vercel function.
-- `pnpm db:seed` is not transactional: a remote seed that fails halfway must be run again. It checks the database before deleting anything, so bad credentials or a missing migration leave the data intact.
+- `pnpm db:seed` is not transactional: a remote seed that fails halfway must be run again. It checks the database before deleting anything, so bad credentials or an unmigrated database leave the data intact. Run `pnpm db:migrate` first: it does not detect a schema that is only partly migrated.
 
 ---
 

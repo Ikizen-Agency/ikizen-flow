@@ -7,9 +7,9 @@ on:
     - cron: "0 6 * * *"
   workflow_dispatch:
 
-# Shares the production deployment group: a reset never overlaps a migration.
+# Separate from the deployment group: a queued reset must never displace a pending deployment.
 concurrency:
-  group: deploy-refs/heads/main
+  group: reset-demo
   cancel-in-progress: false
 
 permissions:
@@ -17,7 +17,10 @@ permissions:
 
 jobs:
   reset:
+    # Manual runs from other branches must not seed production with unreviewed code.
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
 
@@ -31,9 +34,11 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      # The confirmation host is derived here so this job can only reset the configured database.
+      # Migrates first so the seed always matches the schema of this checkout. The confirmation host is
+      # derived here so this job can only reset the configured database.
       - name: Reseed production demo
         run: |
+          pnpm db:migrate
           host="${DATABASE_URL#*://}"
           export IKIZEN_CONFIRM_REMOTE_SEED="${host%%[/?]*}"
           pnpm db:seed
